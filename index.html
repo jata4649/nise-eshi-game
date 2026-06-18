@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ニセ絵師を探せ</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -12,8 +12,9 @@
     <h1>ニセ絵師を探せ</h1>
     <p class="subtitle">お絵描き × 人狼 × パーティーゲーム</p>
 
+    <!-- トップ画面 -->
     <section id="top-screen" class="screen active">
-      <button id="create-room-btn">部屋を作る</button>
+      <button id="create-room-btn" class="primary-btn">部屋を作る</button>
 
       <div class="join-box">
         <input id="room-id-input" type="text" placeholder="部屋コードを入力">
@@ -21,48 +22,75 @@
       </div>
     </section>
 
+    <!-- 名前入力画面 -->
     <section id="name-screen" class="screen">
       <h2>名前を入力</h2>
-      <input id="player-name-input" type="text" placeholder="あなたの名前">
-      <button id="enter-room-btn">参加する</button>
+      <p class="note">みんなに表示される名前です</p>
+
+      <input id="player-name-input" type="text" placeholder="あなたの名前" maxlength="12">
+      <button id="enter-room-btn" class="primary-btn">参加する</button>
     </section>
 
+    <!-- ロビー画面 -->
     <section id="lobby-screen" class="screen">
       <h2>ロビー</h2>
-      <p>部屋コード：<span id="room-id-display">----</span></p>
+
+      <div class="room-code-box">
+        <p>部屋コード</p>
+        <div id="room-id-display" class="room-code">----</div>
+      </div>
 
       <h3>参加者</h3>
       <ul id="players-list"></ul>
 
       <button id="ready-btn">準備OK</button>
-      <button id="start-game-btn">ゲーム開始</button>
+      <button id="start-game-btn" class="primary-btn">ゲーム開始</button>
+
+      <p class="note">
+        ※今は仮実装なので、1人用の画面確認モードです。
+      </p>
     </section>
 
+    <!-- お題確認画面 -->
     <section id="topic-screen" class="screen">
       <h2>あなたのお題</h2>
+      <p class="note">他の人に見せないでください</p>
+
       <div id="topic-display">？？？</div>
-      <button id="go-drawing-btn">お絵描きへ</button>
+
+      <button id="go-drawing-btn" class="primary-btn">お絵描きへ</button>
     </section>
 
+    <!-- お絵描き画面 -->
     <section id="drawing-screen" class="screen">
       <h2>お絵描き</h2>
-      <canvas id="drawing-canvas" width="300" height="300"></canvas>
+      <p class="note">指でキャンバスに絵を描いてください</p>
+
+      <div class="canvas-wrap">
+        <canvas id="drawing-canvas"></canvas>
+      </div>
 
       <div class="tools">
-        <button id="clear-canvas-btn">消す</button>
-        <button id="finish-drawing-btn">描き終わった</button>
+        <button id="clear-canvas-btn" class="danger-btn">消す</button>
+        <button id="finish-drawing-btn" class="primary-btn">描き終わった</button>
       </div>
     </section>
 
+    <!-- 投票画面 -->
     <section id="vote-screen" class="screen">
       <h2>ニセ絵師だと思う人に投票</h2>
+      <p class="note">今は仮実装なので、自分だけ表示されます</p>
+
       <div id="vote-list"></div>
     </section>
 
+    <!-- 結果画面 -->
     <section id="result-screen" class="screen">
       <h2>結果発表</h2>
+
       <div id="result-display"></div>
-      <button id="back-top-btn">トップへ戻る</button>
+
+      <button id="back-top-btn" class="primary-btn">トップへ戻る</button>
     </section>
   </main>
 
