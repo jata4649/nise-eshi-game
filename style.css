@@ -1,1 +1,100 @@
+* {
+  box-sizing: border-box;
+}
 
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f7f4ef;
+  color: #222;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px;
+  text-align: center;
+}
+
+h1 {
+  margin-top: 32px;
+  font-size: 32px;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 32px;
+}
+
+.screen {
+  display: none;
+}
+
+.screen.active {
+  display: block;
+}
+
+button {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 14px 16px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  background: #ffb84d;
+  color: #222;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #ffa726;
+}
+
+input {
+  width: 100%;
+  padding: 14px;
+  margin: 8px 0;
+  font-size: 18px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+}
+
+.join-box {
+  margin-top: 24px;
+}
+
+#players-list {
+  padding: 0;
+  list-style: none;
+}
+
+#players-list li {
+  background: white;
+  margin: 8px 0;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+#topic-display {
+  margin: 24px 0;
+  padding: 32px;
+  font-size: 40px;
+  font-weight: bold;
+  background: white;
+  border-radius: 16px;
+}
+
+#drawing-canvas {
+  width: 300px;
+  height: 300px;
+  background: white;
+  border: 3px solid #333;
+  border-radius: 12px;
+  touch-action: none;
+}
+
+.tools {
+  margin-top: 16px;
+}
