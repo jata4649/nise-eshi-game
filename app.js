@@ -4,12 +4,30 @@ let currentRoomId = null;
 let playerName = null;
 let currentTopic = null;
 
+let drawingPhase = 1;
+let timerId = null;
+let timeLeft = 0;
+let maxTime = 0;
+
+let midImageDataUrl = null;
+let finalImageDataUrl = null;
+
+const FIRST_DRAW_SECONDS = 20;
+const SECOND_DRAW_SECONDS = 25;
+
 const canvas = document.getElementById("drawing-canvas");
 const ctx = canvas.getContext("2d");
 
 let isDrawing = false;
 let canvasCssWidth = 300;
 let canvasCssHeight = 300;
+
+let strokes = [];
+let currentStroke = null;
+
+// -------------------------
+// 画面管理
+// -------------------------
 
 function showScreen(screenId) {
   const screens = document.querySelectorAll(".screen");
@@ -21,10 +39,10 @@ function showScreen(screenId) {
   const targetScreen = document.getElementById(screenId);
   targetScreen.classList.add("active");
 
-  // お絵描き画面を表示した後にキャンバスサイズを調整
   if (screenId === "drawing-screen") {
     requestAnimationFrame(() => {
       resizeCanvasForMobile();
+      redrawCanvas();
     });
   }
 
@@ -54,7 +72,7 @@ function addPlayerToLobby(name) {
   playersList.innerHTML = "";
 
   const li = document.createElement("li");
-  li.textContent = name + "（あなた）";
+  li.textContent = "🎨 " + name + "（あなた）";
   playersList.appendChild(li);
 }
 
@@ -104,10 +122,12 @@ document.getElementById("ready-btn").addEventListener("click", () => {
 });
 
 document.getElementById("start-game-btn").addEventListener("click", () => {
+  resetRound();
+
   currentTopic = pickRandomTopic();
 
   // 今は仮で多数派のお題だけ表示
-  // Firebase接続後は、1人だけ minority を配るようにする
+  // Firebase接続後は、1人だけ minority を配ります
   document.getElementById("topic-display").textContent = currentTopic.majority;
 
   showScreen("topic-screen");
@@ -118,17 +138,131 @@ document.getElementById("start-game-btn").addEventListener("click", () => {
 // -------------------------
 
 document.getElementById("go-drawing-btn").addEventListener("click", () => {
-  showScreen("drawing-screen");
+  startFirstDrawingPhase();
 });
 
 // -------------------------
-// お絵描き
+// ラウンド初期化
+// -------------------------
+
+function resetRound() {
+  drawingPhase = 1;
+  midImageDataUrl = null;
+  finalImageDataUrl = null;
+  strokes = [];
+  currentStroke = null;
+  stopTimer();
+
+  requestAnimationFrame(() => {
+    resizeCanvasForMobile();
+    clearCanvasOnly();
+  });
+}
+
+// -------------------------
+// タイマー
+// -------------------------
+
+function startTimer(seconds, onEnd) {
+  stopTimer();
+
+  maxTime = seconds;
+  timeLeft = seconds;
+
+  updateTimerDisplay();
+
+  timerId = setInterval(() => {
+    timeLeft -= 1;
+    updateTimerDisplay();
+
+    if (timeLeft <= 0) {
+      stopTimer();
+      onEnd();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = null;
+  }
+}
+
+function updateTimerDisplay() {
+  const timerDisplay = document.getElementById("timer-display");
+  const timerProgress = document.getElementById("timer-progress");
+
+  timerDisplay.textContent = String(timeLeft);
+
+  const percent = Math.max(0, Math.min(100, (timeLeft / maxTime) * 100));
+  timerProgress.style.width = percent + "%";
+
+  if (timeLeft <= 5) {
+    timerProgress.style.background = "linear-gradient(90deg, #ff3b3b, #ff9b9b)";
+  } else {
+    timerProgress.style.background = "linear-gradient(90deg, #ff7f7f, #ffcf5c)";
+  }
+}
+
+// -------------------------
+// お絵描きフェーズ
+// -------------------------
+
+function startFirstDrawingPhase() {
+  drawingPhase = 1;
+
+  document.getElementById("drawing-phase-label").textContent = "前半お絵描き";
+  document.getElementById("drawing-title").textContent = "まずは20秒で描こう";
+  document.getElementById("drawing-help").textContent = "途中で一度見せ合います。描きすぎ注意！";
+  document.getElementById("finish-drawing-btn").textContent = "前半を完了";
+
+  showScreen("drawing-screen");
+
+  startTimer(FIRST_DRAW_SECONDS, () => {
+    finishCurrentDrawingPhase();
+  });
+}
+
+function startSecondDrawingPhase() {
+  drawingPhase = 2;
+
+  document.getElementById("drawing-phase-label").textContent = "後半お絵描き";
+  document.getElementById("drawing-title").textContent = "残り25秒で仕上げよう";
+  document.getElementById("drawing-help").textContent = "途中討論をふまえて、絵を完成させましょう。";
+  document.getElementById("finish-drawing-btn").textContent = "最終絵を完成";
+
+  showScreen("drawing-screen");
+
+  startTimer(SECOND_DRAW_SECONDS, () => {
+    finishCurrentDrawingPhase();
+  });
+}
+
+document.getElementById("finish-drawing-btn").addEventListener("click", () => {
+  finishCurrentDrawingPhase();
+});
+
+function finishCurrentDrawingPhase() {
+  stopTimer();
+  stopDrawing();
+
+  if (drawingPhase === 1) {
+    midImageDataUrl = getCanvasImage();
+    showMidReview();
+  } else {
+    finalImageDataUrl = getCanvasImage();
+    showFinalReview();
+  }
+}
+
+// -------------------------
+// キャンバス処理
 // -------------------------
 
 function resizeCanvasForMobile() {
   const rect = canvas.getBoundingClientRect();
 
-  // display:none の状態だと rect が 0 になるため、その場合は何もしない
   if (rect.width === 0 || rect.height === 0) {
     return;
   }
@@ -165,11 +299,17 @@ function startDrawing(event) {
 
   isDrawing = true;
 
-  if (canvas.setPointerCapture) {
+  if (canvas.setPointerCapture && event.pointerId !== undefined) {
     canvas.setPointerCapture(event.pointerId);
   }
 
   const pos = getCanvasPos(event);
+
+  currentStroke = {
+    color: "#000000",
+    width: 4,
+    points: [pos]
+  };
 
   ctx.beginPath();
   ctx.moveTo(pos.x, pos.y);
@@ -178,13 +318,15 @@ function startDrawing(event) {
 function draw(event) {
   event.preventDefault();
 
-  if (!isDrawing) return;
+  if (!isDrawing || !currentStroke) return;
 
   const pos = getCanvasPos(event);
 
+  currentStroke.points.push(pos);
+
   ctx.lineTo(pos.x, pos.y);
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = currentStroke.color;
+  ctx.lineWidth = currentStroke.width;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.stroke();
@@ -194,7 +336,7 @@ function stopDrawing(event) {
   if (event) {
     event.preventDefault();
 
-    if (canvas.releasePointerCapture) {
+    if (canvas.releasePointerCapture && event.pointerId !== undefined) {
       try {
         canvas.releasePointerCapture(event.pointerId);
       } catch (error) {
@@ -203,11 +345,58 @@ function stopDrawing(event) {
     }
   }
 
+  if (isDrawing && currentStroke && currentStroke.points.length > 1) {
+    strokes.push(currentStroke);
+  }
+
   isDrawing = false;
+  currentStroke = null;
 }
 
-function clearCanvas() {
+function redrawCanvas() {
+  clearCanvasOnly();
+
+  strokes.forEach((stroke) => {
+    drawStroke(stroke);
+  });
+}
+
+function drawStroke(stroke) {
+  if (!stroke.points || stroke.points.length === 0) return;
+
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+  for (let i = 1; i < stroke.points.length; i++) {
+    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+  }
+
+  ctx.strokeStyle = stroke.color;
+  ctx.lineWidth = stroke.width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+}
+
+function clearCanvasOnly() {
   ctx.clearRect(0, 0, canvasCssWidth, canvasCssHeight);
+}
+
+function clearCanvasAll() {
+  strokes = [];
+  currentStroke = null;
+  clearCanvasOnly();
+}
+
+function undoStroke() {
+  strokes.pop();
+  redrawCanvas();
+}
+
+function getCanvasImage() {
+  resizeCanvasForMobile();
+  redrawCanvas();
+  return canvas.toDataURL("image/png");
 }
 
 canvas.addEventListener("pointerdown", startDrawing);
@@ -217,21 +406,71 @@ canvas.addEventListener("pointercancel", stopDrawing);
 canvas.addEventListener("pointerleave", stopDrawing);
 
 document.getElementById("clear-canvas-btn").addEventListener("click", () => {
-  clearCanvas();
+  clearCanvasAll();
 });
 
-document.getElementById("finish-drawing-btn").addEventListener("click", () => {
-  showVoteScreen();
+document.getElementById("undo-btn").addEventListener("click", () => {
+  undoStroke();
 });
 
-// 画面回転・サイズ変更時
-// 注意：今の仮実装ではリサイズすると絵が消えます。
-// Firebase接続後はストロークデータから再描画するので改善できます。
 window.addEventListener("resize", () => {
   if (document.getElementById("drawing-screen").classList.contains("active")) {
     resizeCanvasForMobile();
+    redrawCanvas();
   }
 });
+
+// -------------------------
+// 途中公開・最終公開
+// -------------------------
+
+function showMidReview() {
+  document.getElementById("review-phase-label").textContent = "途中公開";
+  document.getElementById("review-title").textContent = "途中経過を見せ合おう";
+  document.getElementById("review-description").textContent =
+    "ここで軽く討論します。誰が怪しいか探りましょう。";
+
+  document.getElementById("gallery-player-name").textContent =
+    (playerName || "あなた") + " の途中絵";
+
+  document.getElementById("review-image").src = midImageDataUrl;
+
+  document.getElementById("discussion-text").innerHTML =
+    "軽く話し合いましょう。<br>ただし、お題を直接言うのは禁止！";
+
+  const nextBtn = document.getElementById("review-next-btn");
+  nextBtn.textContent = "後半25秒を始める";
+
+  nextBtn.onclick = () => {
+    startSecondDrawingPhase();
+  };
+
+  showScreen("review-screen");
+}
+
+function showFinalReview() {
+  document.getElementById("review-phase-label").textContent = "最終公開";
+  document.getElementById("review-title").textContent = "完成した絵を見せ合おう";
+  document.getElementById("review-description").textContent =
+    "最終討論です。ニセ絵師だと思う人を決めましょう。";
+
+  document.getElementById("gallery-player-name").textContent =
+    (playerName || "あなた") + " の完成絵";
+
+  document.getElementById("review-image").src = finalImageDataUrl;
+
+  document.getElementById("discussion-text").innerHTML =
+    "最終討論タイム！<br>絵の違和感や発言からニセ絵師を探しましょう。";
+
+  const nextBtn = document.getElementById("review-next-btn");
+  nextBtn.textContent = "投票へ進む";
+
+  nextBtn.onclick = () => {
+    showVoteScreen();
+  };
+
+  showScreen("review-screen");
+}
 
 // -------------------------
 // 投票
@@ -244,6 +483,7 @@ function showVoteScreen() {
   voteList.innerHTML = "";
 
   const btn = document.createElement("button");
+  btn.className = "primary-btn";
   btn.textContent = playerName || "あなた";
 
   btn.addEventListener("click", () => {
@@ -262,11 +502,12 @@ function showResultScreen() {
   const minorityWord = currentTopic ? currentTopic.minority : "虎";
 
   document.getElementById("result-display").innerHTML = `
-    <p>これは仮の結果画面です。</p>
-    <p>Firebase接続後に、実際の投票結果を表示します。</p>
+    <div class="result-big">仮の結果です</div>
+    <p>Firebase接続後に、実際の投票結果とニセ絵師を表示します。</p>
     <hr>
     <p><strong>多数派のお題：</strong>${majorityWord}</p>
     <p><strong>ニセ絵師のお題：</strong>${minorityWord}</p>
+    <p class="note">今後はここに得票数・勝敗・正体を表示します。</p>
   `;
 
   showScreen("result-screen");
@@ -276,13 +517,18 @@ document.getElementById("back-top-btn").addEventListener("click", () => {
   currentRoomId = null;
   playerName = null;
   currentTopic = null;
+  drawingPhase = 1;
+  midImageDataUrl = null;
+  finalImageDataUrl = null;
+
+  stopTimer();
 
   document.getElementById("room-id-input").value = "";
   document.getElementById("player-name-input").value = "";
   document.getElementById("players-list").innerHTML = "";
   document.getElementById("result-display").innerHTML = "";
 
-  clearCanvas();
+  clearCanvasAll();
 
   showScreen("top-screen");
 });
