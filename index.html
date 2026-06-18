@@ -8,89 +8,190 @@
 </head>
 <body>
 
+  <div class="app-bg"></div>
+
   <main class="container">
-    <h1>ニセ絵師を探せ</h1>
-    <p class="subtitle">お絵描き × 人狼 × パーティーゲーム</p>
+
+    <header class="app-header">
+      <div class="logo-badge">🎨</div>
+      <h1>ニセ絵師を探せ</h1>
+      <p class="subtitle">お絵描き × 人狼 × パーティー</p>
+    </header>
 
     <!-- トップ画面 -->
     <section id="top-screen" class="screen active">
-      <button id="create-room-btn" class="primary-btn">部屋を作る</button>
+      <div class="hero-card">
+        <div class="hero-icon">🕵️‍♂️</div>
+        <h2>1人だけ違うお題。</h2>
+        <p>
+          絵を見て、会話して、<br>
+          ニセ絵師を見つけよう。
+        </p>
+      </div>
 
-      <div class="join-box">
-        <input id="room-id-input" type="text" placeholder="部屋コードを入力">
-        <button id="join-room-btn">部屋に参加する</button>
+      <div class="card">
+        <button id="create-room-btn" class="primary-btn">部屋を作る</button>
+
+        <div class="divider">
+          <span>または</span>
+        </div>
+
+        <input id="room-id-input" type="text" placeholder="部屋コードを入力" maxlength="8">
+        <button id="join-room-btn" class="secondary-btn">部屋に参加する</button>
+      </div>
+
+      <div class="rule-card">
+        <h3>今回のルール</h3>
+        <ol>
+          <li>お題を確認</li>
+          <li>20秒お絵描き</li>
+          <li>途中で見せ合い</li>
+          <li>25秒追加でお絵描き</li>
+          <li>最終討論して投票</li>
+        </ol>
       </div>
     </section>
 
     <!-- 名前入力画面 -->
     <section id="name-screen" class="screen">
-      <h2>名前を入力</h2>
-      <p class="note">みんなに表示される名前です</p>
+      <div class="card">
+        <h2>名前を入力</h2>
+        <p class="note">みんなに表示される名前です</p>
 
-      <input id="player-name-input" type="text" placeholder="あなたの名前" maxlength="12">
-      <button id="enter-room-btn" class="primary-btn">参加する</button>
+        <input id="player-name-input" type="text" placeholder="あなたの名前" maxlength="12">
+        <button id="enter-room-btn" class="primary-btn">参加する</button>
+      </div>
     </section>
 
     <!-- ロビー画面 -->
     <section id="lobby-screen" class="screen">
-      <h2>ロビー</h2>
+      <div class="card">
+        <h2>ロビー</h2>
 
-      <div class="room-code-box">
-        <p>部屋コード</p>
-        <div id="room-id-display" class="room-code">----</div>
+        <div class="room-code-box">
+          <p>部屋コード</p>
+          <div id="room-id-display" class="room-code">----</div>
+        </div>
+
+        <div class="mini-flow">
+          <div>20秒<br><span>前半</span></div>
+          <div>途中公開<br><span>討論</span></div>
+          <div>25秒<br><span>後半</span></div>
+          <div>最終公開<br><span>投票</span></div>
+        </div>
+
+        <h3>参加者</h3>
+        <ul id="players-list"></ul>
+
+        <button id="ready-btn" class="secondary-btn">準備OK</button>
+        <button id="start-game-btn" class="primary-btn">ゲーム開始</button>
+
+        <p class="note">
+          ※現在は1人用の仮実装です。次のステップでFirebase同期を入れます。
+        </p>
       </div>
-
-      <h3>参加者</h3>
-      <ul id="players-list"></ul>
-
-      <button id="ready-btn">準備OK</button>
-      <button id="start-game-btn" class="primary-btn">ゲーム開始</button>
-
-      <p class="note">
-        ※今は仮実装なので、1人用の画面確認モードです。
-      </p>
     </section>
 
     <!-- お題確認画面 -->
     <section id="topic-screen" class="screen">
-      <h2>あなたのお題</h2>
-      <p class="note">他の人に見せないでください</p>
+      <div class="card topic-card">
+        <div class="phase-chip">お題確認</div>
 
-      <div id="topic-display">？？？</div>
+        <h2>あなたのお題</h2>
+        <p class="note">他の人に見せないでください</p>
 
-      <button id="go-drawing-btn" class="primary-btn">お絵描きへ</button>
+        <div id="topic-display">？？？</div>
+
+        <button id="go-drawing-btn" class="primary-btn">お絵描き開始</button>
+      </div>
     </section>
 
     <!-- お絵描き画面 -->
     <section id="drawing-screen" class="screen">
-      <h2>お絵描き</h2>
-      <p class="note">指でキャンバスに絵を描いてください</p>
+      <div class="drawing-panel">
+        <div class="drawing-top">
+          <div>
+            <div id="drawing-phase-label" class="phase-chip">前半お絵描き</div>
+            <h2 id="drawing-title">20秒で描こう</h2>
+          </div>
 
-      <div class="canvas-wrap">
-        <canvas id="drawing-canvas"></canvas>
+          <div class="timer-box">
+            <span id="timer-display">20</span>
+            <small>秒</small>
+          </div>
+        </div>
+
+        <div class="progress-shell">
+          <div id="timer-progress" class="progress-bar"></div>
+        </div>
+
+        <p id="drawing-help" class="note">
+          指でキャンバスに絵を描いてください
+        </p>
+
+        <div class="canvas-wrap">
+          <canvas id="drawing-canvas"></canvas>
+        </div>
+
+        <div class="tool-row">
+          <button id="undo-btn" class="small-btn">一つ戻す</button>
+          <button id="clear-canvas-btn" class="small-btn danger-btn">消す</button>
+        </div>
+
+        <button id="finish-drawing-btn" class="primary-btn">この段階を完了</button>
       </div>
+    </section>
 
-      <div class="tools">
-        <button id="clear-canvas-btn" class="danger-btn">消す</button>
-        <button id="finish-drawing-btn" class="primary-btn">描き終わった</button>
+    <!-- 公開・討論画面 -->
+    <section id="review-screen" class="screen">
+      <div class="card">
+        <div id="review-phase-label" class="phase-chip">途中公開</div>
+
+        <h2 id="review-title">途中経過を見せ合おう</h2>
+        <p id="review-description" class="note">
+          軽く話し合って、怪しい人を探しましょう。
+        </p>
+
+        <div class="gallery-card">
+          <div class="gallery-name" id="gallery-player-name">あなたの絵</div>
+          <img id="review-image" class="review-image" alt="描いた絵">
+        </div>
+
+        <div id="discussion-box" class="discussion-box">
+          <div class="discussion-icon">💬</div>
+          <p id="discussion-text">
+            「この絵、何を描いてるんだろう？」<br>
+            ただし、お題を直接言うのは禁止！
+          </p>
+        </div>
+
+        <button id="review-next-btn" class="primary-btn">続きを始める</button>
       </div>
     </section>
 
     <!-- 投票画面 -->
     <section id="vote-screen" class="screen">
-      <h2>ニセ絵師だと思う人に投票</h2>
-      <p class="note">今は仮実装なので、自分だけ表示されます</p>
+      <div class="card">
+        <div class="phase-chip">投票</div>
 
-      <div id="vote-list"></div>
+        <h2>ニセ絵師だと思う人は？</h2>
+        <p class="note">最終討論をもとに投票しましょう。</p>
+
+        <div id="vote-list"></div>
+      </div>
     </section>
 
     <!-- 結果画面 -->
     <section id="result-screen" class="screen">
-      <h2>結果発表</h2>
+      <div class="card result-card">
+        <div class="phase-chip">結果発表</div>
 
-      <div id="result-display"></div>
+        <h2>結果発表</h2>
 
-      <button id="back-top-btn" class="primary-btn">トップへ戻る</button>
+        <div id="result-display"></div>
+
+        <button id="back-top-btn" class="primary-btn">トップへ戻る</button>
+      </div>
     </section>
   </main>
 
