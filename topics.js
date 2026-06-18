@@ -8,6 +8,10 @@ const TOPICS = [
   { majority: "鳥", minority: "ペンギン" },
   { majority: "傘", minority: "きのこ" },
   { majority: "魔法使い", minority: "魔女" },
-  { majority: "王様", minority: "サンタ" }
+  { majority: "王様", minority: "サンタ" },
+  { majority: "飛行機", minority: "鳥" },
+  { majority: "ラーメン", minority: "そば" },
+  { majority: "ケーキ", minority: "パン" },
+  { majority: "おばけ", minority: "雪だるま" },
+  { majority: "宇宙人", minority: "ロボット" }
 ];
-
