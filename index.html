@@ -2,19 +2,72 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ニセ絵師を探せ</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>ニセ絵師を探せ</h1>
-  <p>お絵描き × 人狼 × パーティーゲーム</p>
 
-  <button>部屋を作る</button>
-  <button>部屋に参加する</button>
+  <main class="container">
+    <h1>ニセ絵師を探せ</h1>
+    <p class="subtitle">お絵描き × 人狼 × パーティーゲーム</p>
+
+    <section id="top-screen" class="screen active">
+      <button id="create-room-btn">部屋を作る</button>
+
+      <div class="join-box">
+        <input id="room-id-input" type="text" placeholder="部屋コードを入力">
+        <button id="join-room-btn">部屋に参加する</button>
+      </div>
+    </section>
+
+    <section id="name-screen" class="screen">
+      <h2>名前を入力</h2>
+      <input id="player-name-input" type="text" placeholder="あなたの名前">
+      <button id="enter-room-btn">参加する</button>
+    </section>
+
+    <section id="lobby-screen" class="screen">
+      <h2>ロビー</h2>
+      <p>部屋コード：<span id="room-id-display">----</span></p>
+
+      <h3>参加者</h3>
+      <ul id="players-list"></ul>
+
+      <button id="ready-btn">準備OK</button>
+      <button id="start-game-btn">ゲーム開始</button>
+    </section>
+
+    <section id="topic-screen" class="screen">
+      <h2>あなたのお題</h2>
+      <div id="topic-display">？？？</div>
+      <button id="go-drawing-btn">お絵描きへ</button>
+    </section>
+
+    <section id="drawing-screen" class="screen">
+      <h2>お絵描き</h2>
+      <canvas id="drawing-canvas" width="300" height="300"></canvas>
+
+      <div class="tools">
+        <button id="clear-canvas-btn">消す</button>
+        <button id="finish-drawing-btn">描き終わった</button>
+      </div>
+    </section>
+
+    <section id="vote-screen" class="screen">
+      <h2>ニセ絵師だと思う人に投票</h2>
+      <div id="vote-list"></div>
+    </section>
+
+    <section id="result-screen" class="screen">
+      <h2>結果発表</h2>
+      <div id="result-display"></div>
+      <button id="back-top-btn">トップへ戻る</button>
+    </section>
+  </main>
 
   <script src="topics.js"></script>
   <script src="firebase.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
-
