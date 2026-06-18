@@ -100,3 +100,52 @@ document.getElementById("back-top-btn").addEventListener("click", () => {
   showScreen("top-screen");
 });
 
+const canvas = document.getElementById("drawing-canvas");
+const ctx = canvas.getContext("2d");
+
+let isDrawing = false;
+
+function getCanvasPos(event) {
+  const rect = canvas.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  isDrawing = true;
+
+  const pos = getCanvasPos(event);
+
+  ctx.beginPath();
+  ctx.moveTo(pos.x, pos.y);
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (!isDrawing) return;
+
+  const pos = getCanvasPos(event);
+
+  ctx.lineTo(pos.x, pos.y);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+});
+
+canvas.addEventListener("pointerup", () => {
+  isDrawing = false;
+});
+
+canvas.addEventListener("pointerleave", () => {
+  isDrawing = false;
+});
+
+document.getElementById("clear-canvas-btn").addEventListener("click", () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+
