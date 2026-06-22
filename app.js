@@ -23,6 +23,7 @@ function showVersionBadge() {
 }
 
 showVersionBadge();
+
 // -------------------------
 // キャッシュ回避リロードボタン
 // -------------------------
@@ -77,7 +78,7 @@ showHardReloadButton();
 // 基本状態
 // -------------------------
 
-let currentRoo = null;
+let currentRoomId = null;
 let playerName = null;
 let currentTopic = null;
 
@@ -92,14 +93,14 @@ let reviewTimerAnimationId = null;
 let reviewStartTime = 0;
 let reviewDurationMs = 0;
 
-let ImageDataUrl = null;
+let midImageDataUrl = null;
 let finalImageDataUrl = null;
 
 let onlineTopicHandled = false;
 
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
-const _DISCUSSION_SECONDS = 60;
+const MID_DISCUSSION_SECONDS = 60;
 const FINAL_DISCUSSION_SECONDS = 60;
 
 const LOGICAL_CANVAS_SIZE = 1000;
@@ -222,7 +223,7 @@ function showScreen(screenId) {
   window.scrollTo(0, 0);
 }
 
-function createRoo() {
+function createRoomId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let id = "";
 
@@ -303,12 +304,12 @@ function startOnlineListeners() {
     return;
   }
 
-  if (!currentRoo) {
+  if (!currentRoomId) {
     console.warn("部屋IDがありません。");
     return;
   }
 
-  window.GameDB.listenPlayers(currentRoo, (players) => {
+  window.GameDB.listenPlayers(currentRoomId, (players) => {
     renderOnlinePlayers(players);
   });
 
@@ -408,7 +409,7 @@ function renderReviewGallery(drawings, phaseLabel) {
 }
 
 function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
-  if (!window.GameDB || !currentRoomId) {
+  if (!window.GameDB || !currentRoomId || !window.GameDB.listenDrawings) {
     renderReviewGallery(
       [
         {
@@ -427,7 +428,6 @@ function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
     renderReviewGallery(drawings, phaseLabel);
   });
 }
-
 
 // -------------------------
 // トップ・部屋作成・参加
@@ -515,7 +515,7 @@ document.getElementById("join-room-btn").addEventListener("click", async (event)
 
     console.log("参加予定の部屋コード:", inputRoomId);
 
-    // v610ではここで厳密な部屋存在チェックをしない
+    // v611ではここで厳密な部屋存在チェックをしない
     // 名前入力後の joinRoom で最終確認する
     currentRoomId = inputRoomId;
     onlineTopicHandled = false;
@@ -900,7 +900,7 @@ function forceFinishCurrentDrawingPhase() {
     if (drawingPhase === 1) {
       midImageDataUrl = getCanvasImage();
 
-      if (window.GameDB && currentRoomId) {
+      if (window.GameDB && currentRoomId && window.GameDB.saveDrawing) {
         try {
           await window.GameDB.saveDrawing(
             currentRoomId,
@@ -918,7 +918,7 @@ function forceFinishCurrentDrawingPhase() {
     } else {
       finalImageDataUrl = getCanvasImage();
 
-      if (window.GameDB && currentRoomId) {
+      if (window.GameDB && currentRoomId && window.GameDB.saveDrawing) {
         try {
           await window.GameDB.saveDrawing(
             currentRoomId,
@@ -936,7 +936,6 @@ function forceFinishCurrentDrawingPhase() {
     }
   }, 500);
 }
-
 
 function showTimeupOverlay() {
   const overlay = document.getElementById("timeup-overlay");
@@ -1180,10 +1179,9 @@ function undoStroke() {
 function getCanvasImage() {
   redrawCanvas();
 
-  // Firestore の1ドキュメント上限に引っかかりにくいようにJPEG圧縮
+  // Firestoreの1ドキュメント上限に引っかかりにくいようにJPEG圧縮
   return canvas.toDataURL("image/jpeg", 0.65);
 }
-
 
 // -------------------------
 // キャンバスイベント
@@ -1280,7 +1278,6 @@ function showFinalReview() {
     });
   }, 50);
 }
-
 
 // -------------------------
 // 投票
