@@ -77,7 +77,7 @@ showHardReloadButton();
 // 基本状態
 // -------------------------
 
-let currentRoomId = null;
+let currentRoo = null;
 let playerName = null;
 let currentTopic = null;
 
@@ -92,14 +92,14 @@ let reviewTimerAnimationId = null;
 let reviewStartTime = 0;
 let reviewDurationMs = 0;
 
-let midImageDataUrl = null;
+let ImageDataUrl = null;
 let finalImageDataUrl = null;
 
 let onlineTopicHandled = false;
 
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
-const MID_DISCUSSION_SECONDS = 60;
+const _DISCUSSION_SECONDS = 60;
 const FINAL_DISCUSSION_SECONDS = 60;
 
 const LOGICAL_CANVAS_SIZE = 1000;
@@ -222,7 +222,7 @@ function showScreen(screenId) {
   window.scrollTo(0, 0);
 }
 
-function createRoomId() {
+function createRoo() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let id = "";
 
@@ -303,12 +303,12 @@ function startOnlineListeners() {
     return;
   }
 
-  if (!currentRoomId) {
+  if (!currentRoo) {
     console.warn("部屋IDがありません。");
     return;
   }
 
-  window.GameDB.listenPlayers(currentRoomId, (players) => {
+  window.GameDB.listenPlayers(currentRoo, (players) => {
     renderOnlinePlayers(players);
   });
 
@@ -481,7 +481,7 @@ document.getElementById("create-room-btn").addEventListener("click", async (even
       getErrorText(error) +
       "\n\n" +
       "確認すること:\n" +
-      "1. firebase.js が v610 で読み込まれているか\n" +
+      "1. firebase.js が v611 で読み込まれているか\n" +
       "2. Anonymous が有効か\n" +
       "3. Firestore Rules を Publish 済みか\n" +
       "4. projectId が nise-eshi-game か"
@@ -1239,15 +1239,16 @@ function showMidReview() {
   nextBtn.textContent = "60秒後に後半へ進みます";
   nextBtn.disabled = true;
 
-showScreen("review-screen");
+  showScreen("review-screen");
 
-startDrawingGalleryListener("mid", "途中絵", midImageDataUrl);
+  startDrawingGalleryListener("mid", "途中絵", midImageDataUrl);
 
-setTimeout(() => {
-  startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
-    startSecondDrawingPhase();
-  });
-}, 50);
+  setTimeout(() => {
+    startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
+      startSecondDrawingPhase();
+    });
+  }, 50);
+}
 
 function showFinalReview() {
   hideTimeupOverlay();
@@ -1274,12 +1275,12 @@ function showFinalReview() {
   startDrawingGalleryListener("final", "完成絵", finalImageDataUrl);
 
   setTimeout(() => {
-  startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
-  showVoteScreen();
-  });
-}, 50);
-
+    startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
+      showVoteScreen();
+    });
+  }, 50);
 }
+
 
 // -------------------------
 // 投票
