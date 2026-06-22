@@ -1,4 +1,4 @@
-console.log("app.js version 600 loaded");
+console.log("app.js version 601 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 600 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v600";
+  badge.textContent = "v601";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -156,6 +156,22 @@ function addPlayerToLobby(name) {
 }
 
 // -------------------------
+// お題バッジ
+// -------------------------
+
+function updateDrawingTopicBadge() {
+  const badge = document.getElementById("drawing-topic-badge");
+
+  if (!badge) return;
+
+  if (currentTopic && currentTopic.majority) {
+    badge.textContent = "お題：" + currentTopic.majority;
+  } else {
+    badge.textContent = "お題：？？？";
+  }
+}
+
+// -------------------------
 // トップ・部屋作成・参加
 // -------------------------
 
@@ -204,7 +220,7 @@ document.getElementById("enter-room-btn").addEventListener("click", (event) => {
 
 document.getElementById("ready-btn").addEventListener("click", (event) => {
   flashButton(event.currentTarget);
-  alert("準備OKしました。Firebase接続後は他の人にも同期されます。");
+  alert("準備OK！正式版では、この状態がみんなの画面にも反映されます。");
 });
 
 document.getElementById("start-game-btn").addEventListener("click", (event) => {
@@ -249,6 +265,8 @@ function resetRound() {
 
   hideTimeupOverlay();
   clearCanvasOnly();
+
+  updateDrawingTopicBadge();
 }
 
 // -------------------------
@@ -379,6 +397,7 @@ function startFirstDrawingPhase() {
   drawingPhase = 1;
 
   hideTimeupOverlay();
+  updateDrawingTopicBadge();
 
   document.getElementById("drawing-phase-label").textContent = "前半お絵描き";
   document.getElementById("drawing-title").textContent = "まずは20秒で描こう";
@@ -398,6 +417,7 @@ function startSecondDrawingPhase() {
   drawingPhase = 2;
 
   hideTimeupOverlay();
+  updateDrawingTopicBadge();
 
   document.getElementById("drawing-phase-label").textContent = "後半お絵描き";
   document.getElementById("drawing-title").textContent = "残り25秒で仕上げよう";
@@ -443,6 +463,14 @@ function forceFinishCurrentDrawingPhase() {
 
 function showTimeupOverlay() {
   const overlay = document.getElementById("timeup-overlay");
+  const sfx = document.getElementById("timeup-sfx");
+
+  const sfxList = ["ドン！", "バーン！", "ジャーン！", "カン！", "ドドン！"];
+  const randomSfx = sfxList[Math.floor(Math.random() * sfxList.length)];
+
+  if (sfx) {
+    sfx.textContent = randomSfx;
+  }
 
   if (overlay) {
     overlay.classList.add("show");
@@ -734,7 +762,6 @@ function showMidReview() {
 
   showScreen("review-screen");
 
-  // 画面表示後に確実に自動開始
   setTimeout(() => {
     startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
       startSecondDrawingPhase();
@@ -764,7 +791,6 @@ function showFinalReview() {
 
   showScreen("review-screen");
 
-  // 画面表示後に確実に自動開始
   setTimeout(() => {
     startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
       showVoteScreen();
@@ -784,6 +810,15 @@ function showVoteScreen() {
   const voteList = document.getElementById("vote-list");
   voteList.innerHTML = "";
 
+  const message = document.createElement("div");
+  message.className = "vote-notice";
+  message.innerHTML = `
+    <p><strong>投票タイム！</strong></p>
+    <p>今はお試しプレイなので、自分の名前を押すと結果発表に進みます。</p>
+    <p class="note">正式版では、みんなの投票が集まってから結果が発表されます。</p>
+  `;
+  voteList.appendChild(message);
+
   const btn = document.createElement("button");
   btn.className = "primary-btn";
   btn.textContent = playerName || "あなた";
@@ -797,23 +832,86 @@ function showVoteScreen() {
 }
 
 // -------------------------
-// 結果
+// 結果 豪華版
 // -------------------------
 
 function showResultScreen() {
   const majorityWord = currentTopic ? currentTopic.majority : "猫";
   const minorityWord = currentTopic ? currentTopic.minority : "虎";
 
-  document.getElementById("result-display").innerHTML = `
-    <div class="result-big">仮の結果です</div>
-    <p>Firebase接続後に、実際の投票結果とニセ絵師を表示します。</p>
-    <hr>
-    <p><strong>多数派のお題：</strong>${majorityWord}</p>
-    <p><strong>ニセ絵師のお題：</strong>${minorityWord}</p>
-    <p class="note">今後はここに得票数・勝敗・正体を表示します。</p>
-  `;
+  const resultDisplay = document.getElementById("result-display");
 
   showScreen("result-screen");
+
+  resultDisplay.innerHTML = `
+    <div class="result-showcase">
+      <div class="result-drumroll">
+        <div class="drumroll-icon">🥁</div>
+        <div class="drumroll-text">集計中……</div>
+        <div class="drumroll-sub">みんなの投票を確認しています</div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    resultDisplay.innerHTML = `
+      <div class="result-showcase">
+
+        <div class="result-burst">🎉 結果発表 🎉</div>
+
+        <div class="result-reveal-card">
+          <div class="result-label">今回のお題</div>
+
+          <div class="topic-versus">
+            <div class="topic-box majority">
+              <span>多数派</span>
+              <strong>${majorityWord}</strong>
+            </div>
+
+            <div class="vs-mark">VS</div>
+
+            <div class="topic-box minority">
+              <span>ニセ絵師</span>
+              <strong>${minorityWord}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-winner-card">
+          <div class="winner-icon">🕵️‍♂️</div>
+          <h3>今回はお試し結果です</h3>
+          <p>
+            正式版では、ここに<br>
+            <strong>一番票を集めた人</strong>、<strong>ニセ絵師の正体</strong>、<strong>勝ったチーム</strong><br>
+            がド派手に表示されます。
+          </p>
+        </div>
+
+        <div class="result-mini-stats">
+          <div>
+            <span>投票状況</span>
+            <strong>準備中</strong>
+          </div>
+          <div>
+            <span>通信状態</span>
+            <strong>みんなと通信中〜</strong>
+          </div>
+          <div>
+            <span>次の目標</span>
+            <strong>オンライン対戦</strong>
+          </div>
+        </div>
+
+        <div class="result-notice">
+          <p>
+            今は1人で流れを確認するお試し版です。<br>
+            次のアップデートで、みんなの絵・投票・結果がリアルタイムで反映されるようになります。
+          </p>
+        </div>
+
+      </div>
+    `;
+  }, 1200);
 }
 
 // -------------------------
@@ -848,6 +946,7 @@ document.getElementById("back-top-btn").addEventListener("click", (event) => {
 
   hideTimeupOverlay();
   clearCanvasOnly();
+  updateDrawingTopicBadge();
 
   showScreen("top-screen");
 });
