@@ -1,4 +1,4 @@
-console.log("firebase.js version 608 loaded");
+console.log("firebase.js version 611 loaded");
 
 // ==============================
 // Firebase 設定
@@ -40,7 +40,6 @@ let unsubscribeRoom = null;
 let unsubscribePlayers = null;
 let unsubscribeDrawings = null;
 
-
 // ==============================
 // 共通
 // ==============================
@@ -69,7 +68,6 @@ async function signIn() {
     return result.user;
   } catch (error) {
     console.error("匿名ログイン失敗:", error);
-
     throw error;
   }
 }
@@ -394,6 +392,7 @@ async function startGame(roomId, topic) {
 async function startOnlineGame(roomId, topic) {
   return startGame(roomId, topic);
 }
+
 // ==============================
 // 絵の保存
 // ==============================
@@ -413,32 +412,39 @@ async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
     throw new Error("画像データが空です");
   }
 
-  await signIn();
+  try {
+    await signIn();
 
-  const uid = getCurrentUid();
+    const uid = getCurrentUid();
 
-  if (!uid) {
-    throw new Error("ログインUIDが取得できません");
+    if (!uid) {
+      throw new Error("ログインUIDが取得できません");
+    }
+
+    const drawingRef = db
+      .collection("rooms")
+      .doc(fixedRoomId)
+      .collection("drawings")
+      .doc(phase + "_" + uid);
+
+    await drawingRef.set(
+      {
+        uid: uid,
+        name: playerName || "名無し",
+        phase: phase,
+        image: imageDataUrl,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    console.log("絵を保存しました:", fixedRoomId, phase, uid);
+
+    return true;
+  } catch (error) {
+    console.error("saveDrawing error:", error);
+    throw error;
   }
-
-  const drawingRef = db
-    .collection("rooms")
-    .doc(fixedRoomId)
-    .collection("drawings")
-    .doc(phase + "_" + uid);
-
-  await drawingRef.set(
-    {
-      uid: uid,
-      name: playerName || "名無し",
-      phase: phase,
-      image: imageDataUrl,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    },
-    { merge: true }
-  );
-
-  console.log("絵を保存しました:", fixedRoomId, phase, uid);
 }
 
 // ==============================
@@ -450,6 +456,11 @@ function listenDrawings(roomId, phase, callback) {
 
   if (!fixedRoomId) {
     console.warn("listenDrawings: 部屋IDが空");
+    return null;
+  }
+
+  if (!phase) {
+    console.warn("listenDrawings: phase が空");
     return null;
   }
 
@@ -511,7 +522,6 @@ function stopListeners() {
   console.log("Firebase リスナー停止");
 }
 
-
 // ==============================
 // app.js へ公開
 // ==============================
@@ -526,11 +536,10 @@ window.GameDB = {
   listenRoom,
   startGame,
   startOnlineGame,
-  stopListeners,
-  getCurrentUid,
   saveDrawing,
   listenDrawings,
-
+  stopListeners,
+  getCurrentUid
 };
 
 console.log("GameDB ready:", window.GameDB);
