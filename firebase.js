@@ -1,9 +1,8 @@
-console.log("firebase.js version 614 loaded");
+console.log("firebase.js version 615 loaded");
 
 // ==============================
 // Firebase 設定
 // ==============================
-
 const firebaseConfig = {
   apiKey: "AIzaSyDcYlfCcJVFwctETjLdHcEaCgXPdSZ-4Uc",
   authDomain: "nise-eshi-game.firebaseapp.com",
@@ -16,7 +15,6 @@ const firebaseConfig = {
 // ==============================
 // Firebase 初期化
 // ==============================
-
 try {
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
@@ -25,27 +23,30 @@ try {
     console.log("Firebase already initialized");
   }
 } catch (error) {
-  console.error("Firebase initialize error:", error);
+  console.error("Firebase初期化エラー:", error);
   alert(
     "Firebase初期化に失敗しました。\n\n" +
-    "エラー内容:\n" +
-    (error.message || String(error))
+    "code: " + (error.code || "なし") + "\n" +
+    "message: " + (error.message || error)
   );
 }
 
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-let unsubscribeRoom = null;
 let unsubscribePlayers = null;
+let unsubscribeRoom = null;
 let unsubscribeDrawings = null;
 
-// ==============================
-// 共通
-// ==============================
 
+// ==============================
+// 共通関数
+// ==============================
 function normalizeRoomId(roomId) {
-  return String(roomId || "").trim().toUpperCase();
+  return String(roomId || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 function getCurrentUid() {
@@ -55,182 +56,152 @@ function getCurrentUid() {
 async function signIn() {
   try {
     if (auth.currentUser) {
-      console.log("すでに匿名ログイン済み:", auth.currentUser.uid);
-      return auth.currentUser;
+      console.log("すでにログイン済み:", auth.currentUser.uid);
+      return auth.currentUser.uid;
     }
 
-    console.log("匿名ログイン開始");
-
     const result = await auth.signInAnonymously();
-
     console.log("匿名ログイン成功:", result.user.uid);
-
-    return result.user;
+    return result.user.uid;
   } catch (error) {
     console.error("匿名ログイン失敗:", error);
     throw error;
   }
 }
 
+
 // ==============================
 // 部屋作成
 // ==============================
+async function createRoom(roomId, playerName) {
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
 
-async function createRoom(roomId) {
-  const fixedRoomId = normalizeRoomId(roomId);
-
-  if (!fixedRoomId) {
+  if (!cleanRoomId) {
     throw new Error("部屋IDが空です");
   }
 
-  try {
-    await signIn();
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  const playerRef = roomRef.collection("players").doc(uid);
 
-    const uid = getCurrentUid();
+  const roomData = {
+    roomId: cleanRoomId,
+    hostUid: uid,
+    status: "lobby",
+    topic: null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
 
-    if (!uid) {
-      throw new Error("ログインUIDが取得できません");
-    }
+  const playerData = {
+    uid: uid,
+    name: playerName || "名無し",
+    ready: true,
+    isHost: true,
+    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
 
-    const roomRef = db.collection("rooms").doc(fixedRoomId);
+  const batch = db.batch();
+  batch.set(roomRef, roomData, { merge: true });
+  batch.set(playerRef, playerData, { merge: true });
 
-    console.log("Firestore 部屋作成開始:", fixedRoomId);
+  await batch.commit();
 
-    await roomRef.set(
-      {
-        roomId: fixedRoomId,
-        status: "lobby",
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        hostUid: uid,
-        topic: null
-      },
-      { merge: true }
-    );
-
-    console.log("Firestore 部屋作成完了:", fixedRoomId);
-
-    return fixedRoomId;
-  } catch (error) {
-    console.error("createRoom error:", error);
-    throw error;
-  }
+  console.log("部屋作成成功:", cleanRoomId);
+  return cleanRoomId;
 }
 
-// ==============================
-// 部屋存在確認
-// ==============================
 
+// ==============================
+// 部屋存在チェック
+// ==============================
 async function roomExists(roomId) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
-    console.warn("roomExists: 部屋IDが空");
+  if (!cleanRoomId) {
     return false;
   }
 
-  try {
-    await signIn();
+  await signIn();
 
-    const roomRef = db.collection("rooms").doc(fixedRoomId);
-
-    console.log("部屋存在確認開始:", fixedRoomId);
-
-    for (let i = 0; i < 10; i++) {
-      const snap = await roomRef.get();
+  for (let i = 0; i < 10; i++) {
+    try {
+      const snap = await db.collection("rooms").doc(cleanRoomId).get();
 
       if (snap.exists) {
-        console.log("部屋発見:", fixedRoomId);
+        console.log("部屋存在確認成功:", cleanRoomId);
         return true;
       }
 
-      console.log(`部屋確認中 ${i + 1}/10:`, fixedRoomId);
+      console.log("部屋確認リトライ:", i + 1, cleanRoomId);
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    } catch (error) {
+      console.error("部屋存在チェック失敗:", error);
+      throw error;
     }
-
-    console.warn("部屋が見つかりません:", fixedRoomId);
-
-    return false;
-  } catch (error) {
-    console.error("roomExists error:", error);
-    throw error;
   }
+
+  console.warn("部屋が見つかりません:", cleanRoomId);
+  return false;
 }
 
-// ==============================
-// 入室
-// ==============================
 
+// ==============================
+// 部屋参加
+// ==============================
 async function joinRoom(roomId, playerName) {
-  const fixedRoomId = normalizeRoomId(roomId);
-  const fixedName = String(playerName || "").trim();
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
+  if (!cleanRoomId) {
     throw new Error("部屋IDが空です");
   }
 
-  if (!fixedName) {
-    throw new Error("名前が空です");
+  const exists = await roomExists(cleanRoomId);
+
+  if (!exists) {
+    throw new Error("部屋が存在しません");
   }
 
-  try {
-    await signIn();
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  const playerRef = roomRef.collection("players").doc(uid);
 
-    const uid = getCurrentUid();
+  await playerRef.set(
+    {
+      uid: uid,
+      name: playerName || "名無し",
+      ready: false,
+      isHost: false,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
 
-    if (!uid) {
-      throw new Error("ログインUIDが取得できません");
-    }
+  await roomRef.set(
+    {
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
 
-    const roomRef = db.collection("rooms").doc(fixedRoomId);
-
-    console.log("入室前の部屋確認:", fixedRoomId);
-
-    const roomSnap = await roomRef.get();
-
-    if (!roomSnap.exists) {
-      throw new Error("部屋が存在しません: " + fixedRoomId);
-    }
-
-    const playerRef = roomRef.collection("players").doc(uid);
-
-    console.log("プレイヤー登録開始:", fixedRoomId, fixedName, uid);
-
-    await playerRef.set(
-      {
-        uid: uid,
-        name: fixedName,
-        ready: false,
-        joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    await roomRef.set(
-      {
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    console.log("入室完了:", fixedRoomId, fixedName);
-
-    return true;
-  } catch (error) {
-    console.error("joinRoom error:", error);
-    throw error;
-  }
+  console.log("部屋参加成功:", cleanRoomId, playerName);
+  return cleanRoomId;
 }
+
 
 // ==============================
 // 準備OK
 // ==============================
-
 async function setReady(roomId, ready) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
 
   await db
     .collection("rooms")
@@ -244,26 +215,19 @@ async function setReady(roomId, ready) {
       },
       { merge: true }
     );
+
+  console.log("準備状態更新:", cleanRoomId, uid, ready);
 }
 
-
-    console.log("準備状態更新:", fixedRoomId, ready);
-  } catch (error) {
-    console.error("setReady error:", error);
-    throw error;
-  }
-}
 
 // ==============================
 // プレイヤー監視
 // ==============================
-
 function listenPlayers(roomId, callback) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
-    console.warn("listenPlayers: 部屋IDが空");
-    return null;
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
   }
 
   if (unsubscribePlayers) {
@@ -271,11 +235,9 @@ function listenPlayers(roomId, callback) {
     unsubscribePlayers = null;
   }
 
-  console.log("プレイヤー監視開始:", fixedRoomId);
-
   unsubscribePlayers = db
     .collection("rooms")
-    .doc(fixedRoomId)
+    .doc(cleanRoomId)
     .collection("players")
     .orderBy("joinedAt", "asc")
     .onSnapshot(
@@ -284,33 +246,31 @@ function listenPlayers(roomId, callback) {
 
         snapshot.forEach((doc) => {
           players.push({
-            uid: doc.id,
+            id: doc.id,
             ...doc.data()
           });
         });
 
-        console.log("参加者更新:", players);
-
+        console.log("players更新:", players);
         callback(players);
       },
       (error) => {
-        console.error("参加者監視エラー:", error);
+        console.error("players監視エラー:", error);
       }
     );
 
   return unsubscribePlayers;
 }
 
+
 // ==============================
 // 部屋監視
 // ==============================
-
 function listenRoom(roomId, callback) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
-    console.warn("listenRoom: 部屋IDが空");
-    return null;
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
   }
 
   if (unsubscribeRoom) {
@@ -318,15 +278,13 @@ function listenRoom(roomId, callback) {
     unsubscribeRoom = null;
   }
 
-  console.log("部屋監視開始:", fixedRoomId);
-
   unsubscribeRoom = db
     .collection("rooms")
-    .doc(fixedRoomId)
+    .doc(cleanRoomId)
     .onSnapshot(
       (doc) => {
         if (!doc.exists) {
-          console.warn("部屋が存在しません:", fixedRoomId);
+          console.warn("部屋が存在しません:", cleanRoomId);
           callback(null);
           return;
         }
@@ -336,88 +294,85 @@ function listenRoom(roomId, callback) {
           ...doc.data()
         };
 
-        console.log("部屋更新:", room);
-
+        console.log("room更新:", room);
         callback(room);
       },
       (error) => {
-        console.error("部屋監視エラー:", error);
+        console.error("room監視エラー:", error);
       }
     );
 
   return unsubscribeRoom;
 }
 
+
 // ==============================
 // ゲーム開始
 // ==============================
-
 async function startGame(roomId, topic) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
+  if (!cleanRoomId) {
     throw new Error("部屋IDが空です");
   }
 
-  try {
-    await signIn();
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  const roomSnap = await roomRef.get();
 
-    await db.collection("rooms").doc(fixedRoomId).set(
-      {
-        status: "topic",
-        topic: topic,
-        startedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    console.log("ゲーム開始:", fixedRoomId, topic);
-  } catch (error) {
-    console.error("startGame error:", error);
-    throw error;
+  if (!roomSnap.exists) {
+    throw new Error("部屋が存在しません");
   }
+
+  const room = roomSnap.data();
+
+  if (room.hostUid !== uid) {
+    throw new Error("ゲームを開始できるのはホストだけです");
+  }
+
+  await roomRef.set(
+    {
+      status: "playing",
+      topic: topic,
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("ゲーム開始:", cleanRoomId, topic);
 }
 
-async function startOnlineGame(roomId, topic) {
-  return startGame(roomId, topic);
-}
+const startOnlineGame = startGame;
+
 
 // ==============================
-// 絵の保存
+// 絵を保存
 // ==============================
-
 async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
+  if (!cleanRoomId) {
     throw new Error("部屋IDが空です");
   }
 
   if (!phase) {
-    throw new Error("phase が空です");
+    throw new Error("phaseが空です");
   }
 
   if (!imageDataUrl) {
     throw new Error("画像データが空です");
   }
 
-  try {
-    await signIn();
+  const drawingId = `${phase}_${uid}`;
 
-    const uid = getCurrentUid();
-
-    if (!uid) {
-      throw new Error("ログインUIDが取得できません");
-    }
-
-    const drawingRef = db
-      .collection("rooms")
-      .doc(fixedRoomId)
-      .collection("drawings")
-      .doc(phase + "_" + uid);
-
-    await drawingRef.set(
+  await db
+    .collection("rooms")
+    .doc(cleanRoomId)
+    .collection("drawings")
+    .doc(drawingId)
+    .set(
       {
         uid: uid,
         name: playerName || "名無し",
@@ -428,30 +383,22 @@ async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
       { merge: true }
     );
 
-    console.log("絵を保存しました:", fixedRoomId, phase, uid);
-
-    return true;
-  } catch (error) {
-    console.error("saveDrawing error:", error);
-    throw error;
-  }
+  console.log("絵を保存しました:", cleanRoomId, drawingId);
 }
 
-// ==============================
-// 絵の監視
-// ==============================
 
+// ==============================
+// 絵を監視
+// ==============================
 function listenDrawings(roomId, phase, callback) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
-    console.warn("listenDrawings: 部屋IDが空");
-    return null;
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
   }
 
   if (!phase) {
-    console.warn("listenDrawings: phase が空");
-    return null;
+    throw new Error("phaseが空です");
   }
 
   if (unsubscribeDrawings) {
@@ -459,11 +406,9 @@ function listenDrawings(roomId, phase, callback) {
     unsubscribeDrawings = null;
   }
 
-  console.log("絵の監視開始:", fixedRoomId, phase);
-
   unsubscribeDrawings = db
     .collection("rooms")
-    .doc(fixedRoomId)
+    .doc(cleanRoomId)
     .collection("drawings")
     .where("phase", "==", phase)
     .onSnapshot(
@@ -477,59 +422,7 @@ function listenDrawings(roomId, phase, callback) {
           });
         });
 
-        console.log("絵一覧更新:", drawings);
-
-        callback(drawings);
-      },
-      (error) => {
-        console.error("絵の監視エラー:", error);
-      }
-    );
-
-  return unsubscribeDrawings;
-}
-
-// ==============================
-// リスナー停止
-// ==============================
-
-function stopListeners() {
-  if (unsubscribeRoom) {
-    unsubscribeRoom();
-    unsubscribeRoom = null;
-  }
-
-  if (unsubscribePlayers) {
-    unsubscribePlayers();
-    unsubscribePlayers = null;
-  }
-
-  if (unsubscribeDrawings) {
-    unsubscribeDrawings();
-    unsubscribeDrawings = null;
-  }
-
-  console.log("Firebase リスナー停止");
-}
-
-// ==============================
-// app.js へ公開
-// ==============================
-
-window.GameDB = {
-  signIn,
-  createRoom,
-  roomExists,
-  joinRoom,
-  setReady,
-  listenPlayers,
-  listenRoom,
-  startGame,
-  startOnlineGame,
-  saveDrawing,
-  listenDrawings,
-  stopListeners,
-  getCurrentUid
-};
-
-console.log("GameDB ready:", window.GameDB);
+        drawings.sort((a, b) => {
+          const nameA = a.name || "";
+          const nameB = b.name || "";
+          return nameA.localeCompare(nameB, "ja
