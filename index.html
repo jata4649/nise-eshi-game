@@ -97,7 +97,7 @@
         <button id="start-game-btn" class="primary-btn">ゲーム開始</button>
 
         <p class="note">
-          ※現在は1人用の仮実装です。次のステップでFirebase同期を入れます。
+          ※現在はお試しプレイ中です。正式版では、みんなと通信しながら同時に遊べます。
         </p>
       </div>
     </section>
@@ -124,8 +124,13 @@
     <section id="drawing-screen" class="screen">
       <div class="drawing-panel">
 
+        <!-- タイムアップ演出 -->
         <div id="timeup-overlay" class="timeup-overlay">
-          <div>そこまで！</div>
+          <div class="timeup-card">
+            <span id="timeup-sfx" class="timeup-sfx">ドン！</span>
+            <strong>そこまで！</strong>
+            <p>ペンを置いて、みんなの絵を見よう。</p>
+          </div>
         </div>
 
         <div class="drawing-top">
@@ -150,6 +155,11 @@
 
         <div class="canvas-wrap">
           <canvas id="drawing-canvas"></canvas>
+
+          <!-- お題を右下に小さく表示 -->
+          <div id="drawing-topic-badge" class="drawing-topic-badge">
+            お題：？？？
+          </div>
         </div>
 
         <div class="draw-controls">
@@ -246,10 +256,9 @@
     </section>
   </main>
 
-<script src="topics.js?v=600"></script>
-<script src="firebase.js?v=600"></script>
-<script src="app.js?v=600"></script>
+  <script src="topics.js?v=600"></script>
+  <script src="firebase.js?v=600"></script>
+  <script src="app.js?v=600"></script>
 
 </body>
 </html>
-
