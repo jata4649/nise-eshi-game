@@ -1807,3 +1807,209 @@ input:focus {
   background: linear-gradient(180deg, #9cf59c, #62cc62) !important;
 }
 
+/* ==============================
+   v615 タイトル非表示
+============================== */
+
+.app-header,
+.game-header,
+.header,
+.title-area,
+.logo-area,
+.app-logo,
+.logo,
+.main-title,
+.app-title {
+  display: none !important;
+}
+
+
+/* ==============================
+   v615 TOP下部 最新版更新ボタン
+============================== */
+
+.hard-reload-box {
+  margin: 24px 0 8px;
+  padding: 14px;
+  text-align: center;
+  background: rgba(255, 248, 232, 0.82);
+  border: 2px dashed rgba(43, 33, 24, 0.45);
+  border-radius: 18px;
+}
+
+.hard-reload-btn {
+  min-height: 42px;
+  margin: 0 auto 8px;
+  padding: 10px 14px;
+  width: auto;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 900;
+  border-radius: 999px;
+  border: 2px solid #2b2118;
+  background: linear-gradient(180deg, #fff7e8, #e8d2a8);
+  color: #2b2118;
+  box-shadow: 0 4px 0 #2b2118;
+}
+
+.hard-reload-btn:active,
+.hard-reload-btn.pressed-pop {
+  transform: translateY(3px) scale(0.98);
+  box-shadow: 0 1px 0 #2b2118;
+}
+
+.hard-reload-note {
+  margin: 0;
+  color: #80613d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+
+/* ==============================
+   v615 ロビー状態表示
+============================== */
+
+#players-list {
+  padding-left: 0;
+  margin-left: 0;
+}
+
+.player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 250, 240, 0.9);
+  border: 2px solid rgba(43, 33, 24, 0.25);
+  border-radius: 14px;
+  list-style: none;
+}
+
+.player-name {
+  font-weight: 900;
+  color: #2b2118;
+}
+
+.player-status {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 2px solid #2b2118;
+}
+
+.player-status.host {
+  background: #ffd25c;
+  color: #2b2118;
+}
+
+.player-status.ready {
+  background: #8ee48e;
+  color: #183b18;
+}
+
+.player-status.waiting {
+  background: #f3e3c2;
+  color: #80613d;
+}
+
+#start-game-btn:disabled {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+  cursor: not-allowed;
+}
+
+.ready-done {
+  background: linear-gradient(180deg, #9cf59c, #62cc62) !important;
+  color: #183b18 !important;
+}
+
+
+/* ==============================
+   v615 絵ギャラリー黒背景防止
+============================== */
+
+.review-gallery-card,
+.gallery-card,
+.drawing-card {
+  background: #fffaf0;
+}
+
+.review-gallery-image,
+.gallery-image,
+.shared-drawing-image,
+.review-gallery-card img,
+.gallery-card img,
+.drawing-card img,
+.review-image {
+  background: #ffffff !important;
+  display: block;
+}
+
+
+/* ==============================
+   v615 みんなの絵ギャラリー
+============================== */
+
+.review-gallery-grid {
+  margin-top: 18px;
+}
+
+.review-gallery-title {
+  margin: 14px 0 10px;
+  padding: 10px 12px;
+  text-align: center;
+  font-weight: 900;
+  color: #2b2118;
+  background: #ffd66b;
+  border: 2px solid rgba(43, 33, 24, 0.35);
+  border-radius: 14px;
+}
+
+.review-gallery-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.review-gallery-card {
+  padding: 12px;
+  border-radius: 18px;
+  border: 2px solid rgba(43, 33, 24, 0.25);
+  box-shadow: 0 4px 0 rgba(43, 33, 24, 0.18);
+}
+
+.review-gallery-name {
+  margin-bottom: 8px;
+  text-align: center;
+  font-weight: 900;
+  color: #2b2118;
+}
+
+.review-gallery-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 2px solid rgba(43, 33, 24, 0.2);
+}
+
+.review-gallery-empty {
+  padding: 16px;
+  text-align: center;
+  color: #80613d;
+  font-weight: 800;
+  background: rgba(255, 250, 240, 0.85);
+  border-radius: 14px;
+}
+
+@media (min-width: 700px) {
+  .review-gallery-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
