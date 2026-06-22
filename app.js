@@ -112,6 +112,9 @@ let midImageDataUrl = null;
 let finalImageDataUrl = null;
 
 let onlineTopicHandled = false;
+let currentPlayers = [];
+let currentRoomData = null;
+
 
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
@@ -312,6 +315,83 @@ function renderOnlinePlayers(players) {
     playersList.appendChild(li);
   });
 }
+function getMyUidSafe() {
+  if (!window.GameDB || !window.GameDB.getCurrentUid) return null;
+  return window.GameDB.getCurrentUid();
+}
+
+function isCurrentUserHost() {
+  const myUid = getMyUidSafe();
+  if (!myUid || !currentRoomData) return false;
+  return currentRoomData.hostUid === myUid;
+}
+
+function getGuestPlayers() {
+  if (!currentRoomData || !currentRoomData.hostUid) return [];
+  return currentPlayers.filter((player) => player.uid !== currentRoomData.hostUid);
+}
+
+function areAllGuestsReady() {
+  const guestPlayers = getGuestPlayers();
+
+  // ホスト以外が1人もいない場合は開始不可
+  if (guestPlayers.length <= 0) {
+    return false;
+  }
+
+  return guestPlayers.every((player) => player.ready === true);
+}
+
+function canHostStartGame() {
+  if (!isCurrentUserHost()) return false;
+  if (currentPlayers.length < 2) return false;
+  return areAllGuestsReady();
+}
+
+function updateLobbyControlButtons() {
+  const startBtn = document.getElementById("start-game-btn");
+  const readyBtn = document.getElementById("ready-btn");
+
+  const isHost = isCurrentUserHost();
+  const canStart = canHostStartGame();
+
+  if (startBtn) {
+    if (isHost) {
+      startBtn.style.display = "block";
+      startBtn.disabled = !canStart;
+
+      if (canStart) {
+        startBtn.textContent = "ゲーム開始";
+      } else {
+        startBtn.textContent = "全員の準備待ち";
+      }
+    } else {
+      startBtn.style.display = "none";
+      startBtn.disabled = true;
+    }
+  }
+
+  if (readyBtn) {
+    if (isHost) {
+      // ホストは準備OKを押さない
+      readyBtn.style.display = "none";
+    } else {
+      readyBtn.style.display = "block";
+
+      const myUid = getMyUidSafe();
+      const me = currentPlayers.find((player) => player.uid === myUid);
+
+      if (me && me.ready) {
+        readyBtn.textContent = "準備OK済み";
+        readyBtn.classList.add("ready-done");
+      } else {
+        readyBtn.textContent = "準備OK";
+        readyBtn.classList.remove("ready-done");
+      }
+    }
+  }
+}
+
 
 function startOnlineListeners() {
   if (!window.GameDB) {
@@ -325,10 +405,17 @@ function startOnlineListeners() {
   }
 
   window.GameDB.listenPlayers(currentRoomId, (players) => {
-    renderOnlinePlayers(players);
-  });
+  currentPlayers = players || [];
+
+  renderLobbyPlayers(currentPlayers);
+  updateLobbyControlButtons();
+});
+
 
   window.GameDB.listenRoom(currentRoomId, (room) => {
+    currentRoomData = room || null;
+    updateLobbyControlButtons();
+
     if (!room) return;
 
     if (room.status === "topic" && room.topic) {
@@ -623,78 +710,74 @@ document.getElementById("enter-room-btn").addEventListener("click", async (event
 // ロビー
 // -------------------------
 
-document.getElementById("ready-btn").addEventListener("click", async (event) => {
-  flashButton(event.currentTarget);
-
-  if (!window.GameDB || !currentRoomId) {
-    alert("まだ部屋に接続できていません。");
-    return;
-  }
-
+document.getElementById("ready-btn").addEventListener("click", async () => {
   try {
-    event.currentTarget.textContent = "準備OK済み";
+    if (!currentRoomId) {
+      alert("部屋情報がありません。");
+      return;
+    }
 
-    await withTimeout(
-      window.GameDB.setReady(currentRoomId, true),
-      12000,
-      "準備状態の共有に時間がかかっています"
-    );
+    if (isCurrentUserHost()) {
+      alert("ホストは準備OKを押す必要はありません。");
+      updateLobbyControlButtons();
+      return;
+    }
 
-    showOnlineMessage("みんなと通信中〜 準備状態を共有しました。");
+    const myUid = getMyUidSafe();
+    const me = currentPlayers.find((player) => player.uid === myUid);
+    const nextReady = !(me && me.ready);
+
+    await window.GameDB.setReady(currentRoomId, nextReady);
+
+    updateLobbyControlButtons();
+
   } catch (error) {
-    console.error("準備状態エラー:", error);
-
+    console.error("準備OK失敗:", error);
     alert(
-      "準備状態の共有に失敗しました。\n\n" +
-      getErrorText(error)
+      "準備OKの更新に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
     );
   }
 });
 
-document.getElementById("start-game-btn").addEventListener("click", async (event) => {
-  flashButton(event.currentTarget);
-
-  if (!window.GameDB || !currentRoomId) {
-    alert("まだ部屋に接続できていません。");
-    return;
-  }
-
-  const button = event.currentTarget;
-
+document.getElementById("start-game-btn").addEventListener("click", async () => {
   try {
-    button.textContent = "みんなに開始を知らせています…";
-    button.disabled = true;
+    if (!currentRoomId) {
+      alert("部屋情報がありません。");
+      return;
+    }
 
-    resetRound();
+    if (!isCurrentUserHost()) {
+      alert("ゲームを開始できるのはホストだけです。");
+      return;
+    }
 
-    currentTopic = pickRandomTopic();
+    if (currentPlayers.length < 2) {
+      alert("2人以上で開始できます。");
+      return;
+    }
 
-    onlineTopicHandled = true;
+    if (!areAllGuestsReady()) {
+      alert("ホスト以外の全員が準備OKを押すまで開始できません。");
+      return;
+    }
 
-    await withTimeout(
-      window.GameDB.startGame(currentRoomId, currentTopic),
-      12000,
-      "ゲーム開始の共有に時間がかかっています"
-    );
+    const topic = pickRandomTopic();
+    currentTopic = topic;
 
-    document.getElementById("topic-display").textContent = currentTopic.majority;
+    await window.GameDB.startOnlineGame(currentRoomId, topic);
 
-    button.textContent = "ゲーム開始";
-    button.disabled = false;
-
-    showScreen("topic-screen");
   } catch (error) {
-    console.error("ゲーム開始エラー:", error);
-
-    button.textContent = "ゲーム開始";
-    button.disabled = false;
-
+    console.error("ゲーム開始失敗:", error);
     alert(
-      "ゲーム開始の共有に失敗しました。\n\n" +
-      getErrorText(error)
+      "ゲーム開始に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
     );
   }
 });
+
 
 // -------------------------
 // お題確認
