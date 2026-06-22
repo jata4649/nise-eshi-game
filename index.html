@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ニセ絵師を探せ</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=300">
 </head>
 <body>
 
@@ -29,6 +29,14 @@
         </p>
       </div>
 
+      <div class="warning-card">
+        <div class="warning-icon">⚠</div>
+        <div>
+          <strong>お題をそのまま言うのは禁止！</strong>
+          <p>「猫です」「虎です」など、答えを直接言わないで推理しよう。</p>
+        </div>
+      </div>
+
       <div class="card">
         <button id="create-room-btn" class="primary-btn">部屋を作る</button>
 
@@ -46,8 +54,10 @@
           <li>お題を確認</li>
           <li>20秒お絵描き</li>
           <li>途中で見せ合い</li>
+          <li>途中討論 60秒</li>
           <li>25秒追加でお絵描き</li>
-          <li>最終討論して投票</li>
+          <li>最終討論 60秒</li>
+          <li>投票してニセ絵師を探す</li>
         </ol>
       </div>
     </section>
@@ -75,9 +85,9 @@
 
         <div class="mini-flow">
           <div>20秒<br><span>前半</span></div>
-          <div>途中公開<br><span>討論</span></div>
+          <div>60秒<br><span>途中討論</span></div>
           <div>25秒<br><span>後半</span></div>
-          <div>最終公開<br><span>投票</span></div>
+          <div>60秒<br><span>最終討論</span></div>
         </div>
 
         <h3>参加者</h3>
@@ -102,6 +112,10 @@
 
         <div id="topic-display">？？？</div>
 
+        <div class="warning-mini">
+          ⚠ お題をそのまま言うのは禁止！
+        </div>
+
         <button id="go-drawing-btn" class="primary-btn">お絵描き開始</button>
       </div>
     </section>
@@ -109,10 +123,15 @@
     <!-- お絵描き画面 -->
     <section id="drawing-screen" class="screen">
       <div class="drawing-panel">
+
+        <div id="timeup-overlay" class="timeup-overlay">
+          <div>そこまで！</div>
+        </div>
+
         <div class="drawing-top">
           <div>
             <div id="drawing-phase-label" class="phase-chip">前半お絵描き</div>
-            <h2 id="drawing-title">20秒で描こう</h2>
+            <h2 id="drawing-title">まずは20秒で描こう</h2>
           </div>
 
           <div class="timer-box">
@@ -126,11 +145,33 @@
         </div>
 
         <p id="drawing-help" class="note">
-          指でキャンバスに絵を描いてください
+          途中で一度見せ合います。描きすぎ注意！
         </p>
 
         <div class="canvas-wrap">
           <canvas id="drawing-canvas"></canvas>
+        </div>
+
+        <div class="draw-controls">
+          <div class="control-group">
+            <div class="control-label">色</div>
+            <div class="color-row">
+              <button class="color-btn selected" data-color="#000000" aria-label="黒" style="--pen-color:#000000;"></button>
+              <button class="color-btn" data-color="#e53935" aria-label="赤" style="--pen-color:#e53935;"></button>
+              <button class="color-btn" data-color="#1e88e5" aria-label="青" style="--pen-color:#1e88e5;"></button>
+              <button class="color-btn" data-color="#43a047" aria-label="緑" style="--pen-color:#43a047;"></button>
+              <button class="color-btn" data-color="#fdd835" aria-label="黄" style="--pen-color:#fdd835;"></button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">太さ</div>
+            <div class="size-row">
+              <button class="size-btn" data-size="6">細</button>
+              <button class="size-btn selected" data-size="10">中</button>
+              <button class="size-btn" data-size="16">太</button>
+            </div>
+          </div>
         </div>
 
         <div class="tool-row">
@@ -152,6 +193,16 @@
           軽く話し合って、怪しい人を探しましょう。
         </p>
 
+        <div class="review-timer-box">
+          <div class="review-timer-top">
+            <span id="review-timer-label">途中討論</span>
+            <strong><span id="review-timer-display">60</span>秒</strong>
+          </div>
+          <div class="review-progress-shell">
+            <div id="review-progress" class="review-progress-bar"></div>
+          </div>
+        </div>
+
         <div class="gallery-card">
           <div class="gallery-name" id="gallery-player-name">あなたの絵</div>
           <img id="review-image" class="review-image" alt="描いた絵">
@@ -165,7 +216,7 @@
           </p>
         </div>
 
-        <button id="review-next-btn" class="primary-btn">続きを始める</button>
+        <button id="review-next-btn" class="primary-btn" disabled>自動で進みます</button>
       </div>
     </section>
 
@@ -195,8 +246,9 @@
     </section>
   </main>
 
-  <script src="topics.js"></script>
-  <script src="firebase.js"></script>
-  <script src="app.js"></script>
+  <script src="topics.js?v=300"></script>
+  <script src="firebase.js?v=300"></script>
+  <script src="app.js?v=300"></script>
 </body>
 </html>
+
