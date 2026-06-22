@@ -153,6 +153,58 @@ h3 {
   line-height: 1.7;
 }
 
+.warning-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  background: #fff1ce;
+  border: 3px solid #2b2118;
+  border-radius: 20px;
+  box-shadow: 0 7px 0 #2b2118;
+  text-align: left;
+}
+
+.warning-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: #ff7f7f;
+  color: white;
+  border: 2px solid #2b2118;
+  border-radius: 999px;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.warning-card strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.warning-card p {
+  margin: 5px 0 0;
+  color: #5d4328;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.warning-mini {
+  margin: 16px 0;
+  padding: 12px;
+  background: #fff1ce;
+  border: 2px solid #2b2118;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #2b2118;
+}
+
 button {
   display: block;
   width: 100%;
@@ -167,12 +219,19 @@ button {
   cursor: pointer;
   touch-action: manipulation;
   box-shadow: 0 6px 0 #2b2118;
-  transition: transform 0.05s ease, box-shadow 0.05s ease;
+  transition: transform 0.05s ease, box-shadow 0.05s ease, filter 0.1s ease;
 }
 
-button:active {
-  transform: translateY(4px);
+button:active,
+button.pressed-pop {
+  transform: translateY(4px) scale(0.98);
   box-shadow: 0 2px 0 #2b2118;
+  filter: brightness(0.96);
+}
+
+button:disabled {
+  opacity: 0.75;
+  cursor: default;
 }
 
 .primary-btn {
@@ -279,7 +338,7 @@ input:focus {
 
 .room-code {
   font-size: 38px;
-  font-weight: 1000;
+  font-weight: 900;
   letter-spacing: 5px;
 }
 
@@ -296,7 +355,7 @@ input:focus {
   border: 2px solid #2b2118;
   border-radius: 13px;
   font-size: 12px;
-  font-weight: 1000;
+  font-weight: 900;
   line-height: 1.25;
 }
 
@@ -336,7 +395,7 @@ input:focus {
   color: white;
   border-radius: 999px;
   font-size: 13px;
-  font-weight: 1000;
+  font-weight: 900;
   letter-spacing: 0.04em;
 }
 
@@ -348,7 +407,7 @@ input:focus {
   margin: 24px 0;
   padding: 34px 16px;
   font-size: 46px;
-  font-weight: 1000;
+  font-weight: 900;
   background: white;
   border: 3px solid #2b2118;
   border-radius: 22px;
@@ -360,6 +419,7 @@ input:focus {
    ========================= */
 
 .drawing-panel {
+  position: relative;
   padding: 16px;
   background: rgba(255, 255, 255, 0.94);
 }
@@ -391,7 +451,7 @@ input:focus {
 .timer-box span {
   display: block;
   font-size: 34px;
-  font-weight: 1000;
+  font-weight: 900;
   line-height: 0.9;
 }
 
@@ -423,12 +483,6 @@ input:focus {
   will-change: transform;
 }
 
-/* 
-  重要：
-  canvas本体にはborderを付けない。
-  外側のcanvas-wrapにだけ枠を付ける。
-  これで座標ズレと右はみ出しを防ぐ。
-*/
 .canvas-wrap {
   width: 100%;
   max-width: 340px;
@@ -456,15 +510,157 @@ input:focus {
   touch-action: none;
 }
 
+.draw-controls {
+  margin: 16px 0;
+  padding: 12px;
+  background: #fff8e8;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+}
+
+.control-group + .control-group {
+  margin-top: 12px;
+}
+
+.control-label {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #5d4328;
+  text-align: left;
+}
+
+.color-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.color-btn {
+  min-height: 42px;
+  margin: 0;
+  padding: 0;
+  border-radius: 14px;
+  background: var(--pen-color);
+  box-shadow: 0 4px 0 #2b2118;
+}
+
+.color-btn.selected {
+  outline: 4px solid #ffcf5c;
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #2b2118;
+}
+
+.size-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.size-btn {
+  min-height: 42px;
+  margin: 0;
+  padding: 8px;
+  font-size: 14px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 0 #2b2118;
+}
+
+.size-btn.selected {
+  background: #ffcf5c;
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #2b2118;
+}
+
 .tool-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
+.timeup-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(43, 33, 24, 0.55);
+  border-radius: 20px;
+}
+
+.timeup-overlay.show {
+  display: flex;
+}
+
+.timeup-overlay div {
+  padding: 22px 30px;
+  background: #ffcf5c;
+  border: 4px solid #2b2118;
+  border-radius: 24px;
+  box-shadow: 0 8px 0 #2b2118;
+  font-size: 42px;
+  font-weight: 900;
+  animation: popTimeup 0.22s ease-out;
+}
+
+@keyframes popTimeup {
+  from {
+    transform: scale(0.7) rotate(-4deg);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
 /* =========================
-   公開画面
+   公開・討論画面
    ========================= */
+
+.review-timer-box {
+  margin: 18px 0;
+  padding: 14px;
+  background: #fff8e8;
+  border: 2px solid #2b2118;
+  border-radius: 18px;
+}
+
+.review-timer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.review-timer-top strong {
+  font-size: 20px;
+}
+
+.review-progress-shell {
+  width: 100%;
+  height: 14px;
+  padding: 3px;
+  background: #2b2118;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.review-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #8fd3ff, #ffcf5c);
+  border-radius: 999px;
+  transform-origin: left center;
+  transform: scaleX(1);
+  will-change: transform;
+}
 
 .gallery-card {
   margin: 20px 0;
@@ -477,7 +673,7 @@ input:focus {
 .gallery-name {
   margin-bottom: 10px;
   font-size: 16px;
-  font-weight: 1000;
+  font-weight: 900;
 }
 
 .review-image {
@@ -535,7 +731,7 @@ input:focus {
 
 .result-big {
   font-size: 24px;
-  font-weight: 1000;
+  font-weight: 900;
 }
 
 /* =========================
@@ -595,5 +791,9 @@ input:focus {
 
   .canvas-wrap {
     max-width: 320px;
+  }
+
+  .timeup-overlay div {
+    font-size: 34px;
   }
 }
