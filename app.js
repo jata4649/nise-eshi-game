@@ -1,4 +1,4 @@
-console.log("app.js version 610 loaded");
+console.log("app.js version 611 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 610 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v610";
+  badge.textContent = "v611";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -23,6 +23,55 @@ function showVersionBadge() {
 }
 
 showVersionBadge();
+// -------------------------
+// キャッシュ回避リロードボタン
+// -------------------------
+
+function showHardReloadButton() {
+  const button = document.createElement("button");
+
+  button.textContent = "最新版";
+  button.style.position = "fixed";
+  button.style.right = "8px";
+  button.style.bottom = "42px";
+  button.style.zIndex = "9999";
+  button.style.padding = "6px 10px";
+  button.style.fontSize = "12px";
+  button.style.fontWeight = "bold";
+  button.style.color = "#ffffff";
+  button.style.background = "#2b2118";
+  button.style.border = "2px solid #ffcf5c";
+  button.style.borderRadius = "999px";
+  button.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+
+  button.addEventListener("click", async () => {
+    try {
+      button.textContent = "更新中…";
+
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    } catch (error) {
+      console.warn("キャッシュ削除中にエラー:", error);
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("v", "611");
+    url.searchParams.set("reload", Date.now().toString());
+
+    window.location.replace(url.toString());
+  });
+
+  document.body.appendChild(button);
+}
+
+showHardReloadButton();
 
 // -------------------------
 // 基本状態
@@ -297,6 +346,88 @@ function updateDrawingTopicBadge() {
     badge.textContent = "お題：？？？";
   }
 }
+
+// -------------------------
+// みんなの絵ギャラリー
+// -------------------------
+
+function ensureReviewGalleryGrid() {
+  let grid = document.getElementById("review-gallery-grid");
+
+  if (grid) return grid;
+
+  const galleryCard = document.querySelector("#review-screen .gallery-card");
+
+  grid = document.createElement("div");
+  grid.id = "review-gallery-grid";
+  grid.className = "review-gallery-grid";
+
+  if (galleryCard) {
+    galleryCard.insertAdjacentElement("afterend", grid);
+  }
+
+  return grid;
+}
+
+function renderReviewGallery(drawings, phaseLabel) {
+  const grid = ensureReviewGalleryGrid();
+
+  grid.innerHTML = "";
+
+  const title = document.createElement("div");
+  title.className = "review-gallery-title";
+  title.textContent = "みんなの絵：" + phaseLabel;
+  grid.appendChild(title);
+
+  if (!drawings || drawings.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "review-gallery-empty";
+    empty.textContent = "みんなの絵を待っています…";
+    grid.appendChild(empty);
+    return;
+  }
+
+  drawings.forEach((drawing) => {
+    const item = document.createElement("div");
+    item.className = "review-gallery-item";
+
+    const name = document.createElement("div");
+    name.className = "review-gallery-name";
+    name.textContent = drawing.name || "名無し";
+
+    const img = document.createElement("img");
+    img.className = "review-gallery-img";
+    img.src = drawing.image;
+    img.alt = (drawing.name || "名無し") + "の絵";
+
+    item.appendChild(name);
+    item.appendChild(img);
+
+    grid.appendChild(item);
+  });
+}
+
+function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
+  if (!window.GameDB || !currentRoomId) {
+    renderReviewGallery(
+      [
+        {
+          name: playerName || "あなた",
+          image: fallbackImage
+        }
+      ],
+      phaseLabel
+    );
+    return;
+  }
+
+  renderReviewGallery([], phaseLabel);
+
+  window.GameDB.listenDrawings(currentRoomId, phase, (drawings) => {
+    renderReviewGallery(drawings, phaseLabel);
+  });
+}
+
 
 // -------------------------
 // トップ・部屋作成・参加
@@ -763,18 +894,49 @@ function forceFinishCurrentDrawingPhase() {
   redrawCanvas();
   showTimeupOverlay();
 
-  setTimeout(() => {
+  setTimeout(async () => {
     redrawCanvas();
 
     if (drawingPhase === 1) {
       midImageDataUrl = getCanvasImage();
+
+      if (window.GameDB && currentRoomId) {
+        try {
+          await window.GameDB.saveDrawing(
+            currentRoomId,
+            "mid",
+            playerName || "名無し",
+            midImageDataUrl
+          );
+        } catch (error) {
+          console.error("途中絵の保存に失敗:", error);
+          alert("途中絵の共有に失敗しました。\n自分の画面では続行します。");
+        }
+      }
+
       showMidReview();
     } else {
       finalImageDataUrl = getCanvasImage();
+
+      if (window.GameDB && currentRoomId) {
+        try {
+          await window.GameDB.saveDrawing(
+            currentRoomId,
+            "final",
+            playerName || "名無し",
+            finalImageDataUrl
+          );
+        } catch (error) {
+          console.error("完成絵の保存に失敗:", error);
+          alert("完成絵の共有に失敗しました。\n自分の画面では続行します。");
+        }
+      }
+
       showFinalReview();
     }
   }, 500);
 }
+
 
 function showTimeupOverlay() {
   const overlay = document.getElementById("timeup-overlay");
@@ -1017,8 +1179,11 @@ function undoStroke() {
 
 function getCanvasImage() {
   redrawCanvas();
-  return canvas.toDataURL("image/png");
+
+  // Firestore の1ドキュメント上限に引っかかりにくいようにJPEG圧縮
+  return canvas.toDataURL("image/jpeg", 0.65);
 }
+
 
 // -------------------------
 // キャンバスイベント
@@ -1074,14 +1239,15 @@ function showMidReview() {
   nextBtn.textContent = "60秒後に後半へ進みます";
   nextBtn.disabled = true;
 
-  showScreen("review-screen");
+showScreen("review-screen");
 
-  setTimeout(() => {
-    startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
-      startSecondDrawingPhase();
-    });
-  }, 50);
-}
+startDrawingGalleryListener("mid", "途中絵", midImageDataUrl);
+
+setTimeout(() => {
+  startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
+    startSecondDrawingPhase();
+  });
+}, 50);
 
 function showFinalReview() {
   hideTimeupOverlay();
@@ -1105,11 +1271,14 @@ function showFinalReview() {
 
   showScreen("review-screen");
 
+  startDrawingGalleryListener("final", "完成絵", finalImageDataUrl);
+
   setTimeout(() => {
-    startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
-      showVoteScreen();
-    });
-  }, 50);
+  startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
+  showVoteScreen();
+  });
+}, 50);
+
 }
 
 // -------------------------
