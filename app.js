@@ -1,4 +1,4 @@
-console.log("app.js version 611 loaded");
+console.log("app.js version 612 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 611 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v611";
+  badge.textContent = "v612";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -74,7 +74,7 @@ function showHardReloadButton() {
     }
 
     const url = new URL(window.location.href);
-    url.searchParams.set("v", "611");
+    url.searchParams.set("v", "612");
     url.searchParams.set("reload", Date.now().toString());
 
     window.location.replace(url.toString());
