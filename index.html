@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ニセ絵師を探せ</title>
-  <link rel="stylesheet" href="style.css?v=601">
+  <link rel="stylesheet" href="style.css?v=604">
 </head>
 <body>
 
@@ -20,13 +20,19 @@
 
     <!-- トップ画面 -->
     <section id="top-screen" class="screen active">
-      <div class="hero-card">
-        <div class="hero-icon">🕵️‍♂️</div>
-        <h2>1人だけ違うお題。</h2>
-        <p>
-          絵を見て、会話して、<br>
-          ニセ絵師を見つけよう。
-        </p>
+      <div class="hero-card hero-card-visual">
+        <div class="hero-visual">
+          <img src="assets/images/game_top_visual.jpg" alt="ニセ絵師を探せ メインビジュアル">
+        </div>
+
+        <div class="hero-content">
+          <div class="hero-kicker">FIND THE FAKE ARTIST</div>
+          <h2>1人だけ違うお題。</h2>
+          <p>
+            絵を見て、会話して、<br>
+            ニセ絵師を見つけよう。
+          </p>
+        </div>
       </div>
 
       <div class="warning-card">
@@ -136,11 +142,11 @@
         <div class="drawing-top">
           <div>
             <div id="drawing-phase-label" class="phase-chip">前半お絵描き</div>
-            <h2 id="drawing-title">まずは20秒で描こう</h2>
+            <h2 id="drawing-title">まずは15秒で描こう</h2>
           </div>
 
           <div class="timer-box">
-            <span id="timer-display">20</span>
+            <span id="timer-display">15</span>
             <small>秒</small>
           </div>
         </div>
@@ -150,7 +156,7 @@
         </div>
 
         <p id="drawing-help" class="note">
-          途中で一度見せ合います。描きすぎ注意！
+          15秒で一度見せ合います。描きすぎ注意！
         </p>
 
         <div class="canvas-wrap">
@@ -256,9 +262,9 @@
     </section>
   </main>
 
-  <script src="topics.js?v=602"></script>
-  <script src="firebase.js?v=602"></script>
-  <script src="app.js?v=602"></script>
+  <script src="topics.js?v=604"></script>
+  <script src="firebase.js?v=604"></script>
+  <script src="app.js?v=604"></script>
 
 </body>
 </html>
