@@ -15,14 +15,18 @@ let phaseStartTime = 0;
 let phaseDurationMs = 0;
 let phaseEnding = false;
 
+let reviewTimerAnimationId = null;
+let reviewStartTime = 0;
+let reviewDurationMs = 0;
+
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
 
 const FIRST_DRAW_SECONDS = 20;
 const SECOND_DRAW_SECONDS = 25;
+const MID_DISCUSSION_SECONDS = 60;
+const FINAL_DISCUSSION_SECONDS = 60;
 
-// キャンバスの内部座標。
-// スマホの見た目サイズとは別に、1000 x 1000 の世界として扱う。
 const LOGICAL_CANVAS_SIZE = 1000;
 
 const canvas = document.getElementById("drawing-canvas");
@@ -31,6 +35,9 @@ const ctx = canvas.getContext("2d");
 let isDrawing = false;
 let strokes = [];
 let currentStroke = null;
+
+let selectedColor = "#000000";
+let selectedWidth = 10;
 
 // -------------------------
 // キャンバス初期化
@@ -51,18 +58,29 @@ function initCanvasOnce() {
 function applyCanvasStyle() {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 10;
+  ctx.strokeStyle = selectedColor;
+  ctx.lineWidth = selectedWidth;
 }
 
-// 最初に1回だけ初期化。
-// ここ以外では canvas.width / canvas.height を変更しない。
-// これが「タップすると消える」問題の対策。
 initCanvasOnce();
 
 // -------------------------
-// 画面管理
+// 共通UI
 // -------------------------
+
+function flashButton(button) {
+  if (!button) return;
+
+  button.classList.remove("pressed-pop");
+
+  requestAnimationFrame(() => {
+    button.classList.add("pressed-pop");
+
+    setTimeout(() => {
+      button.classList.remove("pressed-pop");
+    }, 120);
+  });
+}
 
 function showScreen(screenId) {
   const screens = document.querySelectorAll(".screen");
@@ -80,10 +98,7 @@ function showScreen(screenId) {
     });
   }
 
-  window.scrollTo({
-    top: 0,
-    behavior: "instant"
-  });
+  window.scrollTo(0, 0);
 }
 
 function createRoomId() {
@@ -114,12 +129,15 @@ function addPlayerToLobby(name) {
 // トップ・部屋作成・参加
 // -------------------------
 
-document.getElementById("create-room-btn").addEventListener("click", () => {
+document.getElementById("create-room-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
   currentRoomId = createRoomId();
   showScreen("name-screen");
 });
 
-document.getElementById("join-room-btn").addEventListener("click", () => {
+document.getElementById("join-room-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
+
   const inputRoomId = document.getElementById("room-id-input").value.trim().toUpperCase();
 
   if (!inputRoomId) {
@@ -131,7 +149,9 @@ document.getElementById("join-room-btn").addEventListener("click", () => {
   showScreen("name-screen");
 });
 
-document.getElementById("enter-room-btn").addEventListener("click", () => {
+document.getElementById("enter-room-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
+
   const nameInput = document.getElementById("player-name-input").value.trim();
 
   if (!nameInput) {
@@ -151,17 +171,18 @@ document.getElementById("enter-room-btn").addEventListener("click", () => {
 // ロビー
 // -------------------------
 
-document.getElementById("ready-btn").addEventListener("click", () => {
+document.getElementById("ready-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
   alert("準備OKしました。Firebase接続後は他の人にも同期されます。");
 });
 
-document.getElementById("start-game-btn").addEventListener("click", () => {
+document.getElementById("start-game-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
+
   resetRound();
 
   currentTopic = pickRandomTopic();
 
-  // 今は仮で多数派のお題だけ表示。
-  // Firebase接続後は、1人だけ minority を配ります。
   document.getElementById("topic-display").textContent = currentTopic.majority;
 
   showScreen("topic-screen");
@@ -171,7 +192,8 @@ document.getElementById("start-game-btn").addEventListener("click", () => {
 // お題確認
 // -------------------------
 
-document.getElementById("go-drawing-btn").addEventListener("click", () => {
+document.getElementById("go-drawing-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
   startFirstDrawingPhase();
 });
 
@@ -190,23 +212,25 @@ function resetRound() {
   currentStroke = null;
 
   phaseEnding = false;
-  stopCountdown();
+  stopDrawingCountdown();
+  stopReviewCountdown();
 
+  hideTimeupOverlay();
   clearCanvasOnly();
 }
 
 // -------------------------
-// ゲージ式カウントダウン
+// お絵描きカウントダウン
 // -------------------------
 
-function startCountdown(seconds, onEnd) {
-  stopCountdown();
+function startDrawingCountdown(seconds, onEnd) {
+  stopDrawingCountdown();
 
   phaseEnding = false;
   phaseDurationMs = seconds * 1000;
   phaseStartTime = performance.now();
 
-  updateCountdownDisplay(seconds, 1);
+  updateDrawingCountdownDisplay(seconds, 1);
 
   function tick(now) {
     const elapsed = now - phaseStartTime;
@@ -214,10 +238,10 @@ function startCountdown(seconds, onEnd) {
     const remainingSeconds = Math.ceil(remainingMs / 1000);
     const progressRatio = Math.max(0, Math.min(1, remainingMs / phaseDurationMs));
 
-    updateCountdownDisplay(remainingSeconds, progressRatio);
+    updateDrawingCountdownDisplay(remainingSeconds, progressRatio);
 
     if (remainingMs <= 0) {
-      stopCountdown();
+      stopDrawingCountdown();
       onEnd();
       return;
     }
@@ -228,20 +252,18 @@ function startCountdown(seconds, onEnd) {
   timerAnimationId = requestAnimationFrame(tick);
 }
 
-function stopCountdown() {
+function stopDrawingCountdown() {
   if (timerAnimationId !== null) {
     cancelAnimationFrame(timerAnimationId);
     timerAnimationId = null;
   }
 }
 
-function updateCountdownDisplay(seconds, progressRatio) {
+function updateDrawingCountdownDisplay(seconds, progressRatio) {
   const timerDisplay = document.getElementById("timer-display");
   const timerProgress = document.getElementById("timer-progress");
 
   timerDisplay.textContent = String(seconds);
-
-  // widthではなくtransformで動かすので滑らか
   timerProgress.style.transform = `scaleX(${progressRatio})`;
 
   if (seconds <= 5) {
@@ -252,29 +274,87 @@ function updateCountdownDisplay(seconds, progressRatio) {
 }
 
 // -------------------------
+// 討論カウントダウン
+// -------------------------
+
+function startReviewCountdown(seconds, label, onEnd) {
+  stopReviewCountdown();
+
+  reviewDurationMs = seconds * 1000;
+  reviewStartTime = performance.now();
+
+  document.getElementById("review-timer-label").textContent = label;
+
+  updateReviewCountdownDisplay(seconds, 1);
+
+  function tick(now) {
+    const elapsed = now - reviewStartTime;
+    const remainingMs = Math.max(0, reviewDurationMs - elapsed);
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    const progressRatio = Math.max(0, Math.min(1, remainingMs / reviewDurationMs));
+
+    updateReviewCountdownDisplay(remainingSeconds, progressRatio);
+
+    if (remainingMs <= 0) {
+      stopReviewCountdown();
+      onEnd();
+      return;
+    }
+
+    reviewTimerAnimationId = requestAnimationFrame(tick);
+  }
+
+  reviewTimerAnimationId = requestAnimationFrame(tick);
+}
+
+function stopReviewCountdown() {
+  if (reviewTimerAnimationId !== null) {
+    cancelAnimationFrame(reviewTimerAnimationId);
+    reviewTimerAnimationId = null;
+  }
+}
+
+function updateReviewCountdownDisplay(seconds, progressRatio) {
+  const display = document.getElementById("review-timer-display");
+  const progress = document.getElementById("review-progress");
+
+  display.textContent = String(seconds);
+  progress.style.transform = `scaleX(${progressRatio})`;
+
+  if (seconds <= 5) {
+    progress.style.background = "linear-gradient(90deg, #ff3b3b, #ff9b9b)";
+  } else {
+    progress.style.background = "linear-gradient(90deg, #8fd3ff, #ffcf5c)";
+  }
+}
+
+// -------------------------
 // お絵描きフェーズ
 // -------------------------
 
 function startFirstDrawingPhase() {
   drawingPhase = 1;
 
+  hideTimeupOverlay();
+
   document.getElementById("drawing-phase-label").textContent = "前半お絵描き";
   document.getElementById("drawing-title").textContent = "まずは20秒で描こう";
   document.getElementById("drawing-help").textContent =
     "途中で一度見せ合います。ゲージがなくなったら強制的に公開されます。";
 
-  // 時間制ルールなので手動完了ボタンは非表示
   document.getElementById("finish-drawing-btn").style.display = "none";
 
   showScreen("drawing-screen");
 
-  startCountdown(FIRST_DRAW_SECONDS, () => {
+  startDrawingCountdown(FIRST_DRAW_SECONDS, () => {
     forceFinishCurrentDrawingPhase();
   });
 }
 
 function startSecondDrawingPhase() {
   drawingPhase = 2;
+
+  hideTimeupOverlay();
 
   document.getElementById("drawing-phase-label").textContent = "後半お絵描き";
   document.getElementById("drawing-title").textContent = "残り25秒で仕上げよう";
@@ -285,12 +365,11 @@ function startSecondDrawingPhase() {
 
   showScreen("drawing-screen");
 
-  startCountdown(SECOND_DRAW_SECONDS, () => {
+  startDrawingCountdown(SECOND_DRAW_SECONDS, () => {
     forceFinishCurrentDrawingPhase();
   });
 }
 
-// 念のため、ボタンが残っていても押せるようにしておく
 document.getElementById("finish-drawing-btn").addEventListener("click", () => {
   forceFinishCurrentDrawingPhase();
 });
@@ -300,20 +379,70 @@ function forceFinishCurrentDrawingPhase() {
 
   phaseEnding = true;
 
-  stopCountdown();
+  stopDrawingCountdown();
   stopDrawing();
 
-  // その瞬間の線データから再描画して画像化
   redrawCanvas();
+  showTimeupOverlay();
 
-  if (drawingPhase === 1) {
-    midImageDataUrl = getCanvasImage();
-    showMidReview();
-  } else {
-    finalImageDataUrl = getCanvasImage();
-    showFinalReview();
-  }
+  setTimeout(() => {
+    redrawCanvas();
+
+    if (drawingPhase === 1) {
+      midImageDataUrl = getCanvasImage();
+      showMidReview();
+    } else {
+      finalImageDataUrl = getCanvasImage();
+      showFinalReview();
+    }
+  }, 500);
 }
+
+function showTimeupOverlay() {
+  const overlay = document.getElementById("timeup-overlay");
+  overlay.classList.add("show");
+}
+
+function hideTimeupOverlay() {
+  const overlay = document.getElementById("timeup-overlay");
+  overlay.classList.remove("show");
+}
+
+// -------------------------
+// ペン設定
+// -------------------------
+
+document.querySelectorAll(".color-btn").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    if (phaseEnding) return;
+
+    flashButton(event.currentTarget);
+
+    selectedColor = event.currentTarget.dataset.color;
+
+    document.querySelectorAll(".color-btn").forEach((btn) => {
+      btn.classList.remove("selected");
+    });
+
+    event.currentTarget.classList.add("selected");
+  });
+});
+
+document.querySelectorAll(".size-btn").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    if (phaseEnding) return;
+
+    flashButton(event.currentTarget);
+
+    selectedWidth = Number(event.currentTarget.dataset.size);
+
+    document.querySelectorAll(".size-btn").forEach((btn) => {
+      btn.classList.remove("selected");
+    });
+
+    event.currentTarget.classList.add("selected");
+  });
+});
 
 // -------------------------
 // キャンバス座標
@@ -342,17 +471,13 @@ function startDrawing(event) {
   const pos = getCanvasPos(event);
 
   currentStroke = {
-    color: "#000000",
-    width: 10,
+    color: selectedColor,
+    width: selectedWidth,
     points: [pos]
   };
 
-  // 重要：
-  // 書き始めた瞬間に strokes に保存する。
-  // これで pointerup が不安定でも、次のタップで前の線が消えにくい。
   strokes.push(currentStroke);
 
-  // タップだけでも点が見えるようにする
   drawDot(pos, currentStroke);
 }
 
@@ -465,18 +590,20 @@ canvas.addEventListener("pointerup", stopDrawing, { passive: false });
 canvas.addEventListener("pointercancel", stopDrawing, { passive: false });
 canvas.addEventListener("pointerleave", stopDrawing, { passive: false });
 
-document.getElementById("clear-canvas-btn").addEventListener("click", () => {
+document.getElementById("clear-canvas-btn").addEventListener("click", (event) => {
   if (phaseEnding) return;
 
+  flashButton(event.currentTarget);
   clearCanvasAll();
 });
 
-document.getElementById("undo-btn").addEventListener("click", () => {
+document.getElementById("undo-btn").addEventListener("click", (event) => {
+  if (phaseEnding) return;
+
+  flashButton(event.currentTarget);
   undoStroke();
 });
 
-// 画面サイズが変わっても canvas.width / canvas.height は変更しない。
-// 描いた絵が消えないように、線データから再描画だけする。
 window.addEventListener("resize", () => {
   if (document.getElementById("drawing-screen").classList.contains("active")) {
     redrawCanvas();
@@ -488,10 +615,12 @@ window.addEventListener("resize", () => {
 // -------------------------
 
 function showMidReview() {
+  hideTimeupOverlay();
+
   document.getElementById("review-phase-label").textContent = "途中公開";
   document.getElementById("review-title").textContent = "途中経過を見せ合おう";
   document.getElementById("review-description").textContent =
-    "ここで軽く討論します。誰が怪しいか探りましょう。";
+    "60秒だけ軽く討論します。誰が怪しいか探りましょう。";
 
   document.getElementById("gallery-player-name").textContent =
     (playerName || "あなた") + " の途中絵";
@@ -499,23 +628,26 @@ function showMidReview() {
   document.getElementById("review-image").src = midImageDataUrl;
 
   document.getElementById("discussion-text").innerHTML =
-    "軽く話し合いましょう。<br>ただし、お題を直接言うのは禁止！";
+    "途中討論タイム！<br>ただし、お題を直接言うのは禁止！";
 
   const nextBtn = document.getElementById("review-next-btn");
-  nextBtn.textContent = "後半25秒を始める";
-
-  nextBtn.onclick = () => {
-    startSecondDrawingPhase();
-  };
+  nextBtn.textContent = "60秒後に後半へ進みます";
+  nextBtn.disabled = true;
 
   showScreen("review-screen");
+
+  startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
+    startSecondDrawingPhase();
+  });
 }
 
 function showFinalReview() {
+  hideTimeupOverlay();
+
   document.getElementById("review-phase-label").textContent = "最終公開";
   document.getElementById("review-title").textContent = "完成した絵を見せ合おう";
   document.getElementById("review-description").textContent =
-    "最終討論です。ニセ絵師だと思う人を決めましょう。";
+    "60秒の最終討論です。ニセ絵師だと思う人を決めましょう。";
 
   document.getElementById("gallery-player-name").textContent =
     (playerName || "あなた") + " の完成絵";
@@ -526,13 +658,14 @@ function showFinalReview() {
     "最終討論タイム！<br>絵の違和感や発言からニセ絵師を探しましょう。";
 
   const nextBtn = document.getElementById("review-next-btn");
-  nextBtn.textContent = "投票へ進む";
-
-  nextBtn.onclick = () => {
-    showVoteScreen();
-  };
+  nextBtn.textContent = "60秒後に投票へ進みます";
+  nextBtn.disabled = true;
 
   showScreen("review-screen");
+
+  startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
+    showVoteScreen();
+  });
 }
 
 // -------------------------
@@ -540,6 +673,7 @@ function showFinalReview() {
 // -------------------------
 
 function showVoteScreen() {
+  stopReviewCountdown();
   showScreen("vote-screen");
 
   const voteList = document.getElementById("vote-list");
@@ -549,7 +683,8 @@ function showVoteScreen() {
   btn.className = "primary-btn";
   btn.textContent = playerName || "あなた";
 
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", (event) => {
+    flashButton(event.currentTarget);
     showResultScreen();
   });
 
@@ -580,7 +715,9 @@ function showResultScreen() {
 // トップへ戻る
 // -------------------------
 
-document.getElementById("back-top-btn").addEventListener("click", () => {
+document.getElementById("back-top-btn").addEventListener("click", (event) => {
+  flashButton(event.currentTarget);
+
   currentRoomId = null;
   playerName = null;
   currentTopic = null;
@@ -591,7 +728,8 @@ document.getElementById("back-top-btn").addEventListener("click", () => {
   finalImageDataUrl = null;
 
   phaseEnding = false;
-  stopCountdown();
+  stopDrawingCountdown();
+  stopReviewCountdown();
 
   isDrawing = false;
   strokes = [];
@@ -602,8 +740,8 @@ document.getElementById("back-top-btn").addEventListener("click", () => {
   document.getElementById("players-list").innerHTML = "";
   document.getElementById("result-display").innerHTML = "";
 
+  hideTimeupOverlay();
   clearCanvasOnly();
 
   showScreen("top-screen");
 });
-
