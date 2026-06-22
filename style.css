@@ -34,7 +34,7 @@ body {
   min-height: 100dvh;
   margin: 0 auto;
   padding: 16px;
-  padding-bottom: 34px;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
   text-align: center;
 }
 
@@ -120,6 +120,7 @@ h3 {
   border: 3px solid #2b2118;
   border-radius: 24px;
   box-shadow: 0 9px 0 #2b2118;
+  overflow: hidden;
 }
 
 .hero-card {
@@ -354,6 +355,10 @@ input:focus {
   box-shadow: inset 0 -5px 0 #ffe1a3;
 }
 
+/* =========================
+   お絵描き画面
+   ========================= */
+
 .drawing-panel {
   padding: 16px;
   background: rgba(255, 255, 255, 0.94);
@@ -404,6 +409,7 @@ input:focus {
   padding: 3px;
   background: #2b2118;
   border-radius: 999px;
+  overflow: hidden;
 }
 
 .progress-bar {
@@ -411,24 +417,43 @@ input:focus {
   height: 100%;
   background: linear-gradient(90deg, #ff7f7f, #ffcf5c);
   border-radius: 999px;
-  transition: width 0.08s linear;
+  transform-origin: left center;
+  transform: scaleX(1);
+  transition: none;
+  will-change: transform;
 }
 
+/* 
+  重要：
+  canvas本体にはborderを付けない。
+  外側のcanvas-wrapにだけ枠を付ける。
+  これで座標ズレと右はみ出しを防ぐ。
+*/
 .canvas-wrap {
   width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1 / 1;
   margin: 16px auto;
+  padding: 0;
+  background: white;
+  border: 4px solid #2b2118;
+  border-radius: 20px;
+  overflow: hidden;
+  touch-action: none;
+  box-shadow: inset 0 0 0 6px #fff7e8, 0 7px 0 #2b2118;
 }
 
 #drawing-canvas {
   display: block;
-  width: min(92vw, 430px);
-  height: min(92vw, 430px);
-  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   background: white;
-  border: 4px solid #2b2118;
-  border-radius: 20px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   touch-action: none;
-  box-shadow: inset 0 0 0 6px #fff7e8, 0 7px 0 #2b2118;
 }
 
 .tool-row {
@@ -436,6 +461,10 @@ input:focus {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+/* =========================
+   公開画面
+   ========================= */
 
 .gallery-card {
   margin: 20px 0;
@@ -509,10 +538,14 @@ input:focus {
   font-weight: 1000;
 }
 
+/* =========================
+   小さいスマホ用
+   ========================= */
+
 @media (max-width: 380px) {
   .container {
     padding: 12px;
-    padding-bottom: 28px;
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
   }
 
   h1 {
@@ -559,136 +592,8 @@ input:focus {
   .mini-flow div {
     font-size: 11px;
   }
+
+  .canvas-wrap {
+    max-width: 320px;
+  }
 }
-
-
-
-/* ===== スマホ描画エリア修正 ===== */
-
-.container {
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
-}
-
-.card,
-.hero-card,
-.drawing-panel,
-.rule-card {
-  overflow: hidden;
-}
-
-.canvas-wrap {
-  width: 100%;
-  max-width: 390px;
-  aspect-ratio: 1 / 1;
-  margin: 16px auto;
-  padding: 0;
-  background: white;
-  border: 4px solid #2b2118;
-  border-radius: 20px;
-  overflow: hidden;
-  touch-action: none;
-  box-shadow: inset 0 0 0 6px #fff7e8, 0 7px 0 #2b2118;
-}
-
-#drawing-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: white;
-  border: none;
-  border-radius: 0;
-  touch-action: none;
-  box-shadow: none;
-  max-width: 100%;
-}
-
-.progress-shell {
-  overflow: hidden;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, #ff7f7f, #ffcf5c);
-  border-radius: 999px;
-  transform-origin: left center;
-  transform: scaleX(1);
-  transition: none;
-  will-change: transform;
-}
-
-/* ==================================================
-   強制修正：スマホ用キャンバス中央寄せ・はみ出し防止
-   ================================================== */
-
-#drawing-screen .drawing-panel {
-  width: 100% !important;
-  padding: 16px !important;
-  overflow: hidden !important;
-}
-
-#drawing-screen .canvas-wrap {
-  box-sizing: border-box !important;
-
-  /* ここが重要：画面幅ではなく親要素の幅に収める */
-  width: 100% !important;
-
-  /* 大きすぎると右にはみ出すので少し小さめに固定 */
-  max-width: 340px !important;
-
-  aspect-ratio: 1 / 1 !important;
-
-  margin-left: auto !important;
-  margin-right: auto !important;
-  margin-top: 16px !important;
-  margin-bottom: 16px !important;
-
-  padding: 0 !important;
-
-  position: relative !important;
-  left: 0 !important;
-  right: auto !important;
-  transform: none !important;
-
-  background: white !important;
-  border: 4px solid #2b2118 !important;
-  border-radius: 20px !important;
-  overflow: hidden !important;
-  touch-action: none !important;
-
-  box-shadow: inset 0 0 0 6px #fff7e8, 0 7px 0 #2b2118 !important;
-}
-
-#drawing-screen #drawing-canvas {
-  box-sizing: border-box !important;
-
-  display: block !important;
-
-  width: 100% !important;
-  height: 100% !important;
-
-  max-width: 100% !important;
-  max-height: 100% !important;
-
-  margin: 0 !important;
-  padding: 0 !important;
-
-  position: static !important;
-  left: auto !important;
-  right: auto !important;
-  transform: none !important;
-
-  background: white !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-
-  touch-action: none !important;
-}
-
-/* ボタンが下で隠れないように */
-.container {
-  padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
-}
-
-
