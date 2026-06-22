@@ -1692,3 +1692,44 @@ input:focus {
     grid-column: 1 / -1;
   }
 }
+/* ==============================
+   v611 最新版更新ボタン
+   TOPページ下部表示
+============================== */
+
+.hard-reload-box {
+  margin: 24px 0 8px;
+  padding: 14px;
+  background: rgba(255, 248, 232, 0.82);
+  border: 2px dashed rgba(43, 33, 24, 0.45);
+  border-radius: 18px;
+}
+
+.hard-reload-btn {
+  min-height: 42px;
+  margin: 0 auto 8px;
+  padding: 10px 14px;
+  width: auto;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 900;
+  border-radius: 999px;
+  border: 2px solid #2b2118;
+  background: linear-gradient(180deg, #fff7e8, #e8d2a8);
+  color: #2b2118;
+  box-shadow: 0 4px 0 #2b2118;
+}
+
+.hard-reload-btn:active,
+.hard-reload-btn.pressed-pop {
+  transform: translateY(3px) scale(0.98);
+  box-shadow: 0 1px 0 #2b2118;
+}
+
+.hard-reload-note {
+  margin: 0;
+  color: #80613d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
