@@ -1,4 +1,4 @@
-console.log("app.js version 604 loaded");
+console.log("app.js version 605 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 604 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v604";
+  badge.textContent = "v605";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -45,6 +45,8 @@ let reviewDurationMs = 0;
 
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
+
+let onlineTopicHandled = false;
 
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
@@ -156,6 +158,83 @@ function addPlayerToLobby(name) {
 }
 
 // -------------------------
+// オンライン同期：ロビー表示
+// -------------------------
+
+function showOnlineMessage(message) {
+  console.log(message);
+
+  const lobbyNote = document.querySelector("#lobby-screen .note");
+
+  if (lobbyNote) {
+    lobbyNote.textContent = message;
+  }
+}
+
+function renderOnlinePlayers(players) {
+  const playersList = document.getElementById("players-list");
+  playersList.innerHTML = "";
+
+  if (!players || players.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "参加者を待っています";
+    playersList.appendChild(li);
+    return;
+  }
+
+  const myUid = window.GameDB ? window.GameDB.getCurrentUid() : null;
+
+  players.forEach((player) => {
+    const li = document.createElement("li");
+
+    const isMe = player.uid === myUid;
+    const readyText = player.ready ? " ✅" : "";
+
+    li.textContent =
+      "🎨 " +
+      player.name +
+      (isMe ? "（あなた）" : "") +
+      readyText;
+
+    playersList.appendChild(li);
+  });
+}
+
+function startOnlineListeners() {
+  if (!window.GameDB) {
+    console.warn("GameDB がありません。firebase.js を確認してください。");
+    return;
+  }
+
+  if (!currentRoomId) {
+    console.warn("部屋IDがありません。");
+    return;
+  }
+
+  window.GameDB.listenPlayers(currentRoomId, (players) => {
+    renderOnlinePlayers(players);
+  });
+
+  window.GameDB.listenRoom(currentRoomId, (room) => {
+    if (!room) return;
+
+    if (room.status === "topic" && room.topic) {
+      if (!onlineTopicHandled) {
+        onlineTopicHandled = true;
+
+        resetRound();
+
+        currentTopic = room.topic;
+
+        document.getElementById("topic-display").textContent = currentTopic.majority;
+
+        showScreen("topic-screen");
+      }
+    }
+  });
+}
+
+// -------------------------
 // お題バッジ
 // -------------------------
 
@@ -175,15 +254,45 @@ function updateDrawingTopicBadge() {
 // トップ・部屋作成・参加
 // -------------------------
 
-document.getElementById("create-room-btn").addEventListener("click", (event) => {
+document.getElementById("create-room-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
 
-  currentRoomId = createRoomId();
-  showScreen("name-screen");
+  if (!window.GameDB) {
+    alert("通信の準備がまだできていません。少し待ってからもう一度お試しください。");
+    return;
+  }
+
+  try {
+    currentRoomId = createRoomId();
+    onlineTopicHandled = false;
+
+    event.currentTarget.textContent = "みんなと通信中〜";
+    event.currentTarget.disabled = true;
+
+    await window.GameDB.signIn();
+    await window.GameDB.createRoom(currentRoomId);
+
+    event.currentTarget.textContent = "部屋を作る";
+    event.currentTarget.disabled = false;
+
+    showScreen("name-screen");
+  } catch (error) {
+    console.error(error);
+
+    event.currentTarget.textContent = "部屋を作る";
+    event.currentTarget.disabled = false;
+
+    alert("部屋の作成に失敗しました。通信状況を確認してもう一度お試しください。");
+  }
 });
 
-document.getElementById("join-room-btn").addEventListener("click", (event) => {
+document.getElementById("join-room-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
+
+  if (!window.GameDB) {
+    alert("通信の準備がまだできていません。少し待ってからもう一度お試しください。");
+    return;
+  }
 
   const inputRoomId = document.getElementById("room-id-input").value.trim().toUpperCase();
 
@@ -192,12 +301,46 @@ document.getElementById("join-room-btn").addEventListener("click", (event) => {
     return;
   }
 
-  currentRoomId = inputRoomId;
-  showScreen("name-screen");
+  try {
+    event.currentTarget.textContent = "部屋を探しています…";
+    event.currentTarget.disabled = true;
+
+    await window.GameDB.signIn();
+
+    const exists = await window.GameDB.roomExists(inputRoomId);
+
+    if (!exists) {
+      event.currentTarget.textContent = "部屋に参加する";
+      event.currentTarget.disabled = false;
+
+      alert("その部屋が見つかりませんでした。部屋コードを確認してください。");
+      return;
+    }
+
+    currentRoomId = inputRoomId;
+    onlineTopicHandled = false;
+
+    event.currentTarget.textContent = "部屋に参加する";
+    event.currentTarget.disabled = false;
+
+    showScreen("name-screen");
+  } catch (error) {
+    console.error(error);
+
+    event.currentTarget.textContent = "部屋に参加する";
+    event.currentTarget.disabled = false;
+
+    alert("通信に失敗しました。もう一度お試しください。");
+  }
 });
 
-document.getElementById("enter-room-btn").addEventListener("click", (event) => {
+document.getElementById("enter-room-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
+
+  if (!window.GameDB) {
+    alert("通信の準備がまだできていません。少し待ってからもう一度お試しください。");
+    return;
+  }
 
   const nameInput = document.getElementById("player-name-input").value.trim();
 
@@ -206,33 +349,92 @@ document.getElementById("enter-room-btn").addEventListener("click", (event) => {
     return;
   }
 
-  playerName = nameInput;
+  try {
+    event.currentTarget.textContent = "参加中…";
+    event.currentTarget.disabled = true;
 
-  document.getElementById("room-id-display").textContent = currentRoomId;
-  addPlayerToLobby(playerName);
+    playerName = nameInput;
 
-  showScreen("lobby-screen");
+    await window.GameDB.joinRoom(currentRoomId, playerName);
+
+    document.getElementById("room-id-display").textContent = currentRoomId;
+
+    showScreen("lobby-screen");
+
+    showOnlineMessage("みんなと通信中〜 参加者を待っています。");
+
+    startOnlineListeners();
+
+    event.currentTarget.textContent = "参加する";
+    event.currentTarget.disabled = false;
+  } catch (error) {
+    console.error(error);
+
+    event.currentTarget.textContent = "参加する";
+    event.currentTarget.disabled = false;
+
+    alert("参加に失敗しました。もう一度お試しください。");
+  }
 });
 
 // -------------------------
 // ロビー
 // -------------------------
 
-document.getElementById("ready-btn").addEventListener("click", (event) => {
+document.getElementById("ready-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
-  alert("準備OK！正式版では、この状態がみんなの画面にも反映されます。");
+
+  if (!window.GameDB || !currentRoomId) {
+    alert("まだ部屋に接続できていません。");
+    return;
+  }
+
+  try {
+    event.currentTarget.textContent = "準備OK済み";
+
+    await window.GameDB.setReady(currentRoomId, true);
+
+    showOnlineMessage("みんなと通信中〜 準備状態を共有しました。");
+  } catch (error) {
+    console.error(error);
+    alert("準備状態の共有に失敗しました。もう一度お試しください。");
+  }
 });
 
-document.getElementById("start-game-btn").addEventListener("click", (event) => {
+document.getElementById("start-game-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
 
-  resetRound();
+  if (!window.GameDB || !currentRoomId) {
+    alert("まだ部屋に接続できていません。");
+    return;
+  }
 
-  currentTopic = pickRandomTopic();
+  try {
+    event.currentTarget.textContent = "みんなに開始を知らせています…";
+    event.currentTarget.disabled = true;
 
-  document.getElementById("topic-display").textContent = currentTopic.majority;
+    resetRound();
 
-  showScreen("topic-screen");
+    currentTopic = pickRandomTopic();
+
+    onlineTopicHandled = true;
+
+    await window.GameDB.startGame(currentRoomId, currentTopic);
+
+    document.getElementById("topic-display").textContent = currentTopic.majority;
+
+    event.currentTarget.textContent = "ゲーム開始";
+    event.currentTarget.disabled = false;
+
+    showScreen("topic-screen");
+  } catch (error) {
+    console.error(error);
+
+    event.currentTarget.textContent = "ゲーム開始";
+    event.currentTarget.disabled = false;
+
+    alert("ゲーム開始の共有に失敗しました。もう一度お試しください。");
+  }
 });
 
 // -------------------------
@@ -921,9 +1123,15 @@ function showResultScreen() {
 document.getElementById("back-top-btn").addEventListener("click", (event) => {
   flashButton(event.currentTarget);
 
+  if (window.GameDB) {
+    window.GameDB.stopListeners();
+  }
+
   currentRoomId = null;
   playerName = null;
   currentTopic = null;
+
+  onlineTopicHandled = false;
 
   drawingPhase = 1;
 
