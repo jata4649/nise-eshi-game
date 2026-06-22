@@ -1192,11 +1192,29 @@ function undoStroke() {
 }
 
 function getCanvasImage() {
-  redrawCanvas();
+  const exportSize = 700;
 
-  // Firestoreの1ドキュメント上限に引っかかりにくいようにJPEG圧縮
-  return canvas.toDataURL("image/jpeg", 0.65);
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = exportSize;
+  tempCanvas.height = exportSize;
+
+  const tempCtx = tempCanvas.getContext("2d");
+
+  // 重要：透明背景を白で埋める
+  tempCtx.fillStyle = "#ffffff";
+  tempCtx.fillRect(0, 0, exportSize, exportSize);
+
+  // 元キャンバスを白背景の上に描画
+  tempCtx.drawImage(canvas, 0, 0, exportSize, exportSize);
+
+  // JPEGで軽量保存
+  const imageDataUrl = tempCanvas.toDataURL("image/jpeg", 0.55);
+
+  console.log("共有用画像サイズ:", Math.round(imageDataUrl.length / 1024), "KB");
+
+  return imageDataUrl;
 }
+
 
 // -------------------------
 // キャンバスイベント
