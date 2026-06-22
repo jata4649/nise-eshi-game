@@ -1,4 +1,4 @@
-console.log("app.js version 606 loaded");
+console.log("app.js version 608 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 606 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v606";
+  badge.textContent = "v608";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
