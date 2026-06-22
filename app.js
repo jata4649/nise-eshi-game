@@ -1,4 +1,4 @@
-console.log("app.js version 605 loaded");
+console.log("app.js version 606 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 605 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v605";
+  badge.textContent = "v606";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -262,27 +262,45 @@ document.getElementById("create-room-btn").addEventListener("click", async (even
     return;
   }
 
+  const button = event.currentTarget;
+
   try {
     currentRoomId = createRoomId();
     onlineTopicHandled = false;
 
-    event.currentTarget.textContent = "みんなと通信中〜";
-    event.currentTarget.disabled = true;
+    button.textContent = "みんなと通信中〜";
+    button.disabled = true;
 
+    console.log("部屋作成開始:", currentRoomId);
+
+    // 匿名ログインは待つ
     await window.GameDB.signIn();
-    await window.GameDB.createRoom(currentRoomId);
+    console.log("匿名ログイン成功:", window.GameDB.getCurrentUid());
 
-    event.currentTarget.textContent = "部屋を作る";
-    event.currentTarget.disabled = false;
+    // 部屋作成は裏で進める
+    // Firestoreに書き込みができているのに画面が止まる問題を避けるため await しない
+    window.GameDB.createRoom(currentRoomId)
+      .then(() => {
+        console.log("部屋作成成功:", currentRoomId);
+      })
+      .catch((error) => {
+        console.error("部屋作成は後から失敗しました:", error);
+      });
+
+    button.textContent = "部屋を作る";
+    button.disabled = false;
 
     showScreen("name-screen");
   } catch (error) {
-    console.error(error);
+    console.error("部屋作成エラー:", error);
 
-    event.currentTarget.textContent = "部屋を作る";
-    event.currentTarget.disabled = false;
+    button.textContent = "部屋を作る";
+    button.disabled = false;
 
-    alert("部屋の作成に失敗しました。通信状況を確認してもう一度お試しください。");
+    alert(
+      "通信に失敗しました。\n\n" +
+      "匿名ログインや通信状態を確認して、もう一度お試しください。"
+    );
   }
 });
 
