@@ -28,26 +28,35 @@ showVersionBadge();
 // キャッシュ回避リロードボタン
 // -------------------------
 
-function showHardReloadButton() {
-  const button = document.createElement("button");
+// -------------------------
+// キャッシュ回避リロードボタン
+// TOP画面の一番下に表示
+// -------------------------
 
-  button.textContent = "最新版";
-  button.style.position = "fixed";
-  button.style.right = "8px";
-  button.style.bottom = "42px";
-  button.style.zIndex = "9999";
-  button.style.padding = "6px 10px";
-  button.style.fontSize = "12px";
-  button.style.fontWeight = "bold";
-  button.style.color = "#ffffff";
-  button.style.background = "#2b2118";
-  button.style.border = "2px solid #ffcf5c";
-  button.style.borderRadius = "999px";
-  button.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+function showHardReloadButton() {
+  const topScreen = document.getElementById("top-screen");
+
+  if (!topScreen) {
+    console.warn("top-screen が見つかりません");
+    return;
+  }
+
+  const reloadBox = document.createElement("div");
+  reloadBox.className = "hard-reload-box";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "hard-reload-btn";
+  button.textContent = "最新版に更新する";
+
+  const text = document.createElement("p");
+  text.className = "hard-reload-note";
+  text.textContent = "表示がおかしい時や古いバージョンが出る時に押してください。";
 
   button.addEventListener("click", async () => {
     try {
       button.textContent = "更新中…";
+      button.disabled = true;
 
       if ("caches" in window) {
         const keys = await caches.keys();
@@ -56,7 +65,9 @@ function showHardReloadButton() {
 
       if ("serviceWorker" in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.unregister()));
+        await Promise.all(
+          registrations.map((registration) => registration.unregister())
+        );
       }
     } catch (error) {
       console.warn("キャッシュ削除中にエラー:", error);
@@ -69,10 +80,14 @@ function showHardReloadButton() {
     window.location.replace(url.toString());
   });
 
-  document.body.appendChild(button);
+  reloadBox.appendChild(button);
+  reloadBox.appendChild(text);
+
+  topScreen.appendChild(reloadBox);
 }
 
 showHardReloadButton();
+
 
 // -------------------------
 // 基本状態
