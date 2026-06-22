@@ -560,3 +560,61 @@ input:focus {
     font-size: 11px;
   }
 }
+
+
+
+/* ===== スマホ描画エリア修正 ===== */
+
+.container {
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+}
+
+.card,
+.hero-card,
+.drawing-panel,
+.rule-card {
+  overflow: hidden;
+}
+
+.canvas-wrap {
+  width: 100%;
+  max-width: 390px;
+  aspect-ratio: 1 / 1;
+  margin: 16px auto;
+  padding: 0;
+  background: white;
+  border: 4px solid #2b2118;
+  border-radius: 20px;
+  overflow: hidden;
+  touch-action: none;
+  box-shadow: inset 0 0 0 6px #fff7e8, 0 7px 0 #2b2118;
+}
+
+#drawing-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: white;
+  border: none;
+  border-radius: 0;
+  touch-action: none;
+  box-shadow: none;
+  max-width: 100%;
+}
+
+.progress-shell {
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ff7f7f, #ffcf5c);
+  border-radius: 999px;
+  transform-origin: left center;
+  transform: scaleX(1);
+  transition: none;
+  will-change: transform;
+}
+
+
