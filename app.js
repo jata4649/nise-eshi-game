@@ -1,13 +1,19 @@
 console.log("app.js loaded");
 
+// -------------------------
+// 基本状態
+// -------------------------
+
 let currentRoomId = null;
 let playerName = null;
 let currentTopic = null;
 
 let drawingPhase = 1;
-let timerId = null;
-let timeLeft = 0;
-let maxTime = 0;
+
+let timerAnimationId = null;
+let phaseStartTime = 0;
+let phaseDurationMs = 0;
+let phaseEnding = false;
 
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
@@ -15,15 +21,44 @@ let finalImageDataUrl = null;
 const FIRST_DRAW_SECONDS = 20;
 const SECOND_DRAW_SECONDS = 25;
 
+// キャンバスの内部座標。
+// スマホの見た目サイズとは別に、1000 x 1000 の世界として扱う。
+const LOGICAL_CANVAS_SIZE = 1000;
+
 const canvas = document.getElementById("drawing-canvas");
 const ctx = canvas.getContext("2d");
 
 let isDrawing = false;
-let canvasCssWidth = 300;
-let canvasCssHeight = 300;
-
 let strokes = [];
 let currentStroke = null;
+
+// -------------------------
+// キャンバス初期化
+// -------------------------
+
+function initCanvasOnce() {
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = LOGICAL_CANVAS_SIZE * dpr;
+  canvas.height = LOGICAL_CANVAS_SIZE * dpr;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  applyCanvasStyle();
+  clearCanvasOnly();
+}
+
+function applyCanvasStyle() {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 10;
+}
+
+// 最初に1回だけ初期化。
+// ここ以外では canvas.width / canvas.height を変更しない。
+// これが「タップすると消える」問題の対策。
+initCanvasOnce();
 
 // -------------------------
 // 画面管理
@@ -41,7 +76,6 @@ function showScreen(screenId) {
 
   if (screenId === "drawing-screen") {
     requestAnimationFrame(() => {
-      resizeCanvasForMobile();
       redrawCanvas();
     });
   }
@@ -126,8 +160,8 @@ document.getElementById("start-game-btn").addEventListener("click", () => {
 
   currentTopic = pickRandomTopic();
 
-  // 今は仮で多数派のお題だけ表示
-  // Firebase接続後は、1人だけ minority を配ります
+  // 今は仮で多数派のお題だけ表示。
+  // Firebase接続後は、1人だけ minority を配ります。
   document.getElementById("topic-display").textContent = currentTopic.majority;
 
   showScreen("topic-screen");
@@ -147,58 +181,70 @@ document.getElementById("go-drawing-btn").addEventListener("click", () => {
 
 function resetRound() {
   drawingPhase = 1;
+
   midImageDataUrl = null;
   finalImageDataUrl = null;
+
+  isDrawing = false;
   strokes = [];
   currentStroke = null;
-  stopTimer();
 
-  requestAnimationFrame(() => {
-    resizeCanvasForMobile();
-    clearCanvasOnly();
-  });
+  phaseEnding = false;
+  stopCountdown();
+
+  clearCanvasOnly();
 }
 
 // -------------------------
-// タイマー
+// ゲージ式カウントダウン
 // -------------------------
 
-function startTimer(seconds, onEnd) {
-  stopTimer();
+function startCountdown(seconds, onEnd) {
+  stopCountdown();
 
-  maxTime = seconds;
-  timeLeft = seconds;
+  phaseEnding = false;
+  phaseDurationMs = seconds * 1000;
+  phaseStartTime = performance.now();
 
-  updateTimerDisplay();
+  updateCountdownDisplay(seconds, 1);
 
-  timerId = setInterval(() => {
-    timeLeft -= 1;
-    updateTimerDisplay();
+  function tick(now) {
+    const elapsed = now - phaseStartTime;
+    const remainingMs = Math.max(0, phaseDurationMs - elapsed);
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    const progressRatio = Math.max(0, Math.min(1, remainingMs / phaseDurationMs));
 
-    if (timeLeft <= 0) {
-      stopTimer();
+    updateCountdownDisplay(remainingSeconds, progressRatio);
+
+    if (remainingMs <= 0) {
+      stopCountdown();
       onEnd();
+      return;
     }
-  }, 1000);
+
+    timerAnimationId = requestAnimationFrame(tick);
+  }
+
+  timerAnimationId = requestAnimationFrame(tick);
 }
 
-function stopTimer() {
-  if (timerId) {
-    clearInterval(timerId);
-    timerId = null;
+function stopCountdown() {
+  if (timerAnimationId !== null) {
+    cancelAnimationFrame(timerAnimationId);
+    timerAnimationId = null;
   }
 }
 
-function updateTimerDisplay() {
+function updateCountdownDisplay(seconds, progressRatio) {
   const timerDisplay = document.getElementById("timer-display");
   const timerProgress = document.getElementById("timer-progress");
 
-  timerDisplay.textContent = String(timeLeft);
+  timerDisplay.textContent = String(seconds);
 
-  const percent = Math.max(0, Math.min(100, (timeLeft / maxTime) * 100));
-  timerProgress.style.width = percent + "%";
+  // widthではなくtransformで動かすので滑らか
+  timerProgress.style.transform = `scaleX(${progressRatio})`;
 
-  if (timeLeft <= 5) {
+  if (seconds <= 5) {
     timerProgress.style.background = "linear-gradient(90deg, #ff3b3b, #ff9b9b)";
   } else {
     timerProgress.style.background = "linear-gradient(90deg, #ff7f7f, #ffcf5c)";
@@ -214,13 +260,16 @@ function startFirstDrawingPhase() {
 
   document.getElementById("drawing-phase-label").textContent = "前半お絵描き";
   document.getElementById("drawing-title").textContent = "まずは20秒で描こう";
-  document.getElementById("drawing-help").textContent = "途中で一度見せ合います。描きすぎ注意！";
-  document.getElementById("finish-drawing-btn").textContent = "前半を完了";
+  document.getElementById("drawing-help").textContent =
+    "途中で一度見せ合います。ゲージがなくなったら強制的に公開されます。";
+
+  // 時間制ルールなので手動完了ボタンは非表示
+  document.getElementById("finish-drawing-btn").style.display = "none";
 
   showScreen("drawing-screen");
 
-  startTimer(FIRST_DRAW_SECONDS, () => {
-    finishCurrentDrawingPhase();
+  startCountdown(FIRST_DRAW_SECONDS, () => {
+    forceFinishCurrentDrawingPhase();
   });
 }
 
@@ -229,23 +278,33 @@ function startSecondDrawingPhase() {
 
   document.getElementById("drawing-phase-label").textContent = "後半お絵描き";
   document.getElementById("drawing-title").textContent = "残り25秒で仕上げよう";
-  document.getElementById("drawing-help").textContent = "途中討論をふまえて、絵を完成させましょう。";
-  document.getElementById("finish-drawing-btn").textContent = "最終絵を完成";
+  document.getElementById("drawing-help").textContent =
+    "途中討論をふまえて描き足しましょう。ゲージがなくなったら強制終了です。";
+
+  document.getElementById("finish-drawing-btn").style.display = "none";
 
   showScreen("drawing-screen");
 
-  startTimer(SECOND_DRAW_SECONDS, () => {
-    finishCurrentDrawingPhase();
+  startCountdown(SECOND_DRAW_SECONDS, () => {
+    forceFinishCurrentDrawingPhase();
   });
 }
 
+// 念のため、ボタンが残っていても押せるようにしておく
 document.getElementById("finish-drawing-btn").addEventListener("click", () => {
-  finishCurrentDrawingPhase();
+  forceFinishCurrentDrawingPhase();
 });
 
-function finishCurrentDrawingPhase() {
-  stopTimer();
+function forceFinishCurrentDrawingPhase() {
+  if (phaseEnding) return;
+
+  phaseEnding = true;
+
+  stopCountdown();
   stopDrawing();
+
+  // その瞬間の線データから再描画して画像化
+  redrawCanvas();
 
   if (drawingPhase === 1) {
     midImageDataUrl = getCanvasImage();
@@ -257,92 +316,28 @@ function finishCurrentDrawingPhase() {
 }
 
 // -------------------------
-// キャンバス処理
+// キャンバス座標
 // -------------------------
-
-function resizeCanvasForMobile() {
-  const rect = canvas.getBoundingClientRect();
-
-  if (rect.width === 0 || rect.height === 0) {
-    return;
-  }
-
-  const dpr = window.devicePixelRatio || 1;
-
-  canvasCssWidth = rect.width;
-  canvasCssHeight = rect.height;
-
-  canvas.width = canvasCssWidth * dpr;
-  canvas.height = canvasCssHeight * dpr;
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 4;
-}
 
 function getCanvasPos(event) {
   const rect = canvas.getBoundingClientRect();
 
-  return {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
-  };
+  const x = ((event.clientX - rect.left) / rect.width) * LOGICAL_CANVAS_SIZE;
+  const y = ((event.clientY - rect.top) / rect.height) * LOGICAL_CANVAS_SIZE;
+
+  return { x, y };
 }
 
-function startDrawing(event) {
-  event.preventDefault();
-
-  resizeCanvasForMobile();
-
-  isDrawing = true;
-
-  if (canvas.setPointerCapture && event.pointerId !== undefined) {
-    canvas.setPointerCapture(event.pointerId);
-  }
-
-  const pos = getCanvasPos(event);
-
-  currentStroke = {
-    color: "#000000",
-    width: 4,
-    points: [pos]
-  };
-
-  ctx.beginPath();
-  ctx.moveTo(pos.x, pos.y);
-}
+// -------------------------
+// 描画処理
+// -------------------------
 
 function startDrawing(event) {
   event.preventDefault();
 
   if (phaseEnding) return;
 
-  // 念のため、前の描画中データが残っていた場合でも消えないようにする
-  if (currentStroke && !strokes.includes(currentStroke)) {
-    strokes.push(currentStroke);
-  }
-
-  isDrawing = false;
-  currentStroke = null;
-
-  applyCanvasStyle();
-
-  // ここで既存の線を必ず復元してから新しい線を始める
-  // もしスマホ側で見た目だけ白紙になっていても、strokesから復活する
-  redrawCanvas();
-
   isDrawing = true;
-
-  if (canvas.setPointerCapture && event.pointerId !== undefined) {
-    try {
-      canvas.setPointerCapture(event.pointerId);
-    } catch (error) {
-      // 何もしない
-    }
-  }
 
   const pos = getCanvasPos(event);
 
@@ -353,37 +348,55 @@ function startDrawing(event) {
   };
 
   // 重要：
-  // 線を書き始めた瞬間に strokes に入れる
-  // これで pointerup がうまく発火しなくても線が消えにくくなる
+  // 書き始めた瞬間に strokes に保存する。
+  // これで pointerup が不安定でも、次のタップで前の線が消えにくい。
   strokes.push(currentStroke);
 
-  ctx.beginPath();
-  ctx.moveTo(pos.x, pos.y);
+  // タップだけでも点が見えるようにする
+  drawDot(pos, currentStroke);
 }
 
+function draw(event) {
+  event.preventDefault();
+
+  if (!isDrawing || !currentStroke || phaseEnding) return;
+
+  const pos = getCanvasPos(event);
+  const points = currentStroke.points;
+  const lastPos = points[points.length - 1];
+
+  currentStroke.points.push(pos);
+
+  drawLineSegment(lastPos, pos, currentStroke);
+}
 
 function stopDrawing(event) {
   if (event) {
     event.preventDefault();
-
-    if (canvas.releasePointerCapture && event.pointerId !== undefined) {
-      try {
-        canvas.releasePointerCapture(event.pointerId);
-      } catch (error) {
-        // 何もしない
-      }
-    }
   }
 
-  // currentStroke はすでに startDrawing の時点で strokes に入れている
-  // ここで再度 push すると重複するので push しない
   isDrawing = false;
   currentStroke = null;
-
-  // 点だけタップした場合も表示されるように再描画
-  redrawCanvas();
 }
 
+function drawDot(pos, stroke) {
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, stroke.width / 2, 0, Math.PI * 2);
+  ctx.fillStyle = stroke.color;
+  ctx.fill();
+}
+
+function drawLineSegment(from, to, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+
+  ctx.strokeStyle = stroke.color;
+  ctx.lineWidth = stroke.width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+}
 
 function redrawCanvas() {
   clearCanvasOnly();
@@ -393,9 +406,13 @@ function redrawCanvas() {
   });
 }
 
-
 function drawStroke(stroke) {
   if (!stroke.points || stroke.points.length === 0) return;
+
+  if (stroke.points.length === 1) {
+    drawDot(stroke.points[0], stroke);
+    return;
+  }
 
   ctx.beginPath();
   ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
@@ -412,34 +429,45 @@ function drawStroke(stroke) {
 }
 
 function clearCanvasOnly() {
-  ctx.clearRect(0, 0, canvasCssWidth, canvasCssHeight);
+  ctx.clearRect(0, 0, LOGICAL_CANVAS_SIZE, LOGICAL_CANVAS_SIZE);
 }
 
 function clearCanvasAll() {
   strokes = [];
   currentStroke = null;
+  isDrawing = false;
+
   clearCanvasOnly();
 }
 
 function undoStroke() {
+  if (phaseEnding) return;
+
   strokes.pop();
+  currentStroke = null;
+  isDrawing = false;
+
   redrawCanvas();
 }
 
 function getCanvasImage() {
-  resizeCanvasForMobile();
   redrawCanvas();
   return canvas.toDataURL("image/png");
 }
 
-canvas.addEventListener("pointerdown", startDrawing);
-canvas.addEventListener("pointermove", draw);
-canvas.addEventListener("pointerup", stopDrawing);
-canvas.addEventListener("pointercancel", stopDrawing);
-canvas.addEventListener("pointerleave", stopDrawing);
-canvas.addEventListener("lostpointercapture", stopDrawing);
+// -------------------------
+// キャンバスイベント
+// -------------------------
+
+canvas.addEventListener("pointerdown", startDrawing, { passive: false });
+canvas.addEventListener("pointermove", draw, { passive: false });
+canvas.addEventListener("pointerup", stopDrawing, { passive: false });
+canvas.addEventListener("pointercancel", stopDrawing, { passive: false });
+canvas.addEventListener("pointerleave", stopDrawing, { passive: false });
 
 document.getElementById("clear-canvas-btn").addEventListener("click", () => {
+  if (phaseEnding) return;
+
   clearCanvasAll();
 });
 
@@ -447,9 +475,10 @@ document.getElementById("undo-btn").addEventListener("click", () => {
   undoStroke();
 });
 
+// 画面サイズが変わっても canvas.width / canvas.height は変更しない。
+// 描いた絵が消えないように、線データから再描画だけする。
 window.addEventListener("resize", () => {
   if (document.getElementById("drawing-screen").classList.contains("active")) {
-    resizeCanvasForMobile();
     redrawCanvas();
   }
 });
@@ -547,22 +576,34 @@ function showResultScreen() {
   showScreen("result-screen");
 }
 
+// -------------------------
+// トップへ戻る
+// -------------------------
+
 document.getElementById("back-top-btn").addEventListener("click", () => {
   currentRoomId = null;
   playerName = null;
   currentTopic = null;
+
   drawingPhase = 1;
+
   midImageDataUrl = null;
   finalImageDataUrl = null;
 
-  stopTimer();
+  phaseEnding = false;
+  stopCountdown();
+
+  isDrawing = false;
+  strokes = [];
+  currentStroke = null;
 
   document.getElementById("room-id-input").value = "";
   document.getElementById("player-name-input").value = "";
   document.getElementById("players-list").innerHTML = "";
   document.getElementById("result-display").innerHTML = "";
 
-  clearCanvasAll();
+  clearCanvasOnly();
 
   showScreen("top-screen");
 });
+
