@@ -229,33 +229,23 @@ async function joinRoom(roomId, playerName) {
 // ==============================
 
 async function setReady(roomId, ready) {
-  const fixedRoomId = normalizeRoomId(roomId);
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
 
-  if (!fixedRoomId) {
-    throw new Error("部屋IDが空です");
-  }
+  await db
+    .collection("rooms")
+    .doc(cleanRoomId)
+    .collection("players")
+    .doc(uid)
+    .set(
+      {
+        ready: ready,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+}
 
-  try {
-    await signIn();
-
-    const uid = getCurrentUid();
-
-    if (!uid) {
-      throw new Error("ログインしていません");
-    }
-
-    await db
-      .collection("rooms")
-      .doc(fixedRoomId)
-      .collection("players")
-      .doc(uid)
-      .set(
-        {
-          ready: !!ready,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        },
-        { merge: true }
-      );
 
     console.log("準備状態更新:", fixedRoomId, ready);
   } catch (error) {
