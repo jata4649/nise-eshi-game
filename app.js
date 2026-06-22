@@ -315,22 +315,52 @@ function startDrawing(event) {
   ctx.moveTo(pos.x, pos.y);
 }
 
-function draw(event) {
+function startDrawing(event) {
   event.preventDefault();
 
-  if (!isDrawing || !currentStroke) return;
+  if (phaseEnding) return;
+
+  // 念のため、前の描画中データが残っていた場合でも消えないようにする
+  if (currentStroke && !strokes.includes(currentStroke)) {
+    strokes.push(currentStroke);
+  }
+
+  isDrawing = false;
+  currentStroke = null;
+
+  applyCanvasStyle();
+
+  // ここで既存の線を必ず復元してから新しい線を始める
+  // もしスマホ側で見た目だけ白紙になっていても、strokesから復活する
+  redrawCanvas();
+
+  isDrawing = true;
+
+  if (canvas.setPointerCapture && event.pointerId !== undefined) {
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch (error) {
+      // 何もしない
+    }
+  }
 
   const pos = getCanvasPos(event);
 
-  currentStroke.points.push(pos);
+  currentStroke = {
+    color: "#000000",
+    width: 10,
+    points: [pos]
+  };
 
-  ctx.lineTo(pos.x, pos.y);
-  ctx.strokeStyle = currentStroke.color;
-  ctx.lineWidth = currentStroke.width;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.stroke();
+  // 重要：
+  // 線を書き始めた瞬間に strokes に入れる
+  // これで pointerup がうまく発火しなくても線が消えにくくなる
+  strokes.push(currentStroke);
+
+  ctx.beginPath();
+  ctx.moveTo(pos.x, pos.y);
 }
+
 
 function stopDrawing(event) {
   if (event) {
@@ -345,13 +375,15 @@ function stopDrawing(event) {
     }
   }
 
-  if (isDrawing && currentStroke && currentStroke.points.length > 1) {
-    strokes.push(currentStroke);
-  }
-
+  // currentStroke はすでに startDrawing の時点で strokes に入れている
+  // ここで再度 push すると重複するので push しない
   isDrawing = false;
   currentStroke = null;
+
+  // 点だけタップした場合も表示されるように再描画
+  redrawCanvas();
 }
+
 
 function redrawCanvas() {
   clearCanvasOnly();
@@ -360,6 +392,7 @@ function redrawCanvas() {
     drawStroke(stroke);
   });
 }
+
 
 function drawStroke(stroke) {
   if (!stroke.points || stroke.points.length === 0) return;
@@ -404,6 +437,7 @@ canvas.addEventListener("pointermove", draw);
 canvas.addEventListener("pointerup", stopDrawing);
 canvas.addEventListener("pointercancel", stopDrawing);
 canvas.addEventListener("pointerleave", stopDrawing);
+canvas.addEventListener("lostpointercapture", stopDrawing);
 
 document.getElementById("clear-canvas-btn").addEventListener("click", () => {
   clearCanvasAll();
