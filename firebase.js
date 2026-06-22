@@ -38,6 +38,8 @@ const db = firebase.firestore();
 
 let unsubscribeRoom = null;
 let unsubscribePlayers = null;
+let unsubscribeDrawings = null;
+
 
 // ==============================
 // 共通
