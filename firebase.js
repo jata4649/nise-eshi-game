@@ -5,12 +5,12 @@ console.log("firebase.js version 607 loaded");
 // ==============================
 // ↓ ここは Firebase Console の設定を入れてください
 const firebaseConfig = {
-  apiKey: "ここにあなたのapiKey",
-  authDomain: "ここにあなたのauthDomain",
-  projectId: "ここにあなたのprojectId",
-  storageBucket: "ここにあなたのstorageBucket",
-  messagingSenderId: "ここにあなたのmessagingSenderId",
-  appId: "ここにあなたのappId"
+apiKey:"AIzaSyDcYlfCcJVFwctETjLdHcEaCgXPdSZ-4Uc",
+authDomain: "nise-eshi-game.firebaseapp.com",
+projectId:"nise-eshi-game",
+storageBucket: "nise-eshi-game.firebasestorage.app",
+messagingSenderId: "284787119511",
+appId: "1:284787119511:web:a62be3e2f97f9c0e22a0d2"
 };
 
 // ==============================
