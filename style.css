@@ -1733,3 +1733,18 @@ input:focus {
   font-weight: 700;
   line-height: 1.5;
 }
+.review-gallery-card,
+.gallery-card,
+.drawing-card {
+  background: #fffaf0;
+}
+
+.review-gallery-image,
+.gallery-image,
+.shared-drawing-image,
+.review-gallery-card img,
+.gallery-card img,
+.drawing-card img {
+  background: #ffffff !important;
+  display: block;
+}
