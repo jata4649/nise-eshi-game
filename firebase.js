@@ -386,7 +386,6 @@ async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
   console.log("絵を保存しました:", cleanRoomId, drawingId);
 }
 
-
 // ==============================
 // 絵を監視
 // ==============================
@@ -425,4 +424,62 @@ function listenDrawings(roomId, phase, callback) {
         drawings.sort((a, b) => {
           const nameA = a.name || "";
           const nameB = b.name || "";
-          return nameA.localeCompare(nameB, "ja
+          return nameA.localeCompare(nameB, "ja");
+        });
+
+        console.log("drawings更新:", phase, drawings);
+        callback(drawings);
+      },
+      (error) => {
+        console.error("drawings監視エラー:", error);
+      }
+    );
+
+  return unsubscribeDrawings;
+}
+
+
+// ==============================
+// リスナー停止
+// ==============================
+function stopListeners() {
+  if (unsubscribePlayers) {
+    unsubscribePlayers();
+    unsubscribePlayers = null;
+  }
+
+  if (unsubscribeRoom) {
+    unsubscribeRoom();
+    unsubscribeRoom = null;
+  }
+
+  if (unsubscribeDrawings) {
+    unsubscribeDrawings();
+    unsubscribeDrawings = null;
+  }
+
+  console.log("Firebase リスナー停止");
+}
+
+
+// ==============================
+// app.js へ公開
+// ==============================
+window.GameDB = {
+  signIn,
+  createRoom,
+  roomExists,
+  joinRoom,
+  setReady,
+  listenPlayers,
+  listenRoom,
+  startGame,
+  startOnlineGame,
+  stopListeners,
+  getCurrentUid,
+  saveDrawing,
+  listenDrawings
+};
+
+console.log("GameDB ready:", window.GameDB);
+
