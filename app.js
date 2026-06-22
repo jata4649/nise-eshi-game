@@ -1,11 +1,14 @@
 console.log("app.js version 615 loaded");
 
-// -------------------------
-// バージョン確認表示
-// -------------------------
-
+// ==============================
+// v615 バージョン表示
+// ==============================
 function showVersionBadge() {
+  const oldBadge = document.getElementById("version-badge");
+  if (oldBadge) oldBadge.remove();
+
   const badge = document.createElement("div");
+  badge.id = "version-badge";
   badge.textContent = "v615";
   badge.style.position = "fixed";
   badge.style.right = "8px";
@@ -24,39 +27,34 @@ function showVersionBadge() {
 
 showVersionBadge();
 
-// -------------------------
-// キャッシュ回避リロードボタン
-// -------------------------
 
-// -------------------------
-// キャッシュ回避リロードボタン
-// TOP画面の一番下に表示
-// -------------------------
-
+// ==============================
+// TOP下部 最新版更新ボタン
+// ==============================
 function showHardReloadButton() {
   const topScreen = document.getElementById("top-screen");
+  if (!topScreen) return;
 
-  if (!topScreen) {
-    console.warn("top-screen が見つかりません");
-    return;
-  }
+  const oldBox = document.getElementById("hard-reload-box");
+  if (oldBox) oldBox.remove();
 
-  const reloadBox = document.createElement("div");
-  reloadBox.className = "hard-reload-box";
+  const box = document.createElement("div");
+  box.id = "hard-reload-box";
+  box.className = "hard-reload-box";
 
   const button = document.createElement("button");
   button.type = "button";
   button.className = "hard-reload-btn";
   button.textContent = "最新版に更新する";
 
-  const text = document.createElement("p");
-  text.className = "hard-reload-note";
-  text.textContent = "表示がおかしい時や古いバージョンが出る時に押してください。";
+  const note = document.createElement("p");
+  note.className = "hard-reload-note";
+  note.textContent = "表示が古い・動きがおかしい時に押してください。";
 
   button.addEventListener("click", async () => {
     try {
-      button.textContent = "更新中…";
       button.disabled = true;
+      button.textContent = "更新中...";
 
       if ("caches" in window) {
         const keys = await caches.keys();
@@ -65,44 +63,50 @@ function showHardReloadButton() {
 
       if ("serviceWorker" in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(
-          registrations.map((registration) => registration.unregister())
-        );
+        await Promise.all(registrations.map((registration) => registration.unregister()));
       }
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("v", "615");
+      url.searchParams.set("reload", Date.now().toString());
+
+      window.location.href = url.toString();
     } catch (error) {
-      console.warn("キャッシュ削除中にエラー:", error);
+      console.error("最新版更新失敗:", error);
+      const url = new URL(window.location.href);
+      url.searchParams.set("v", "615");
+      url.searchParams.set("reload", Date.now().toString());
+      window.location.href = url.toString();
     }
-
-    const url = new URL(window.location.href);
-    url.searchParams.set("v", "615");
-    url.searchParams.set("reload", Date.now().toString());
-
-    window.location.replace(url.toString());
   });
 
-  reloadBox.appendChild(button);
-  reloadBox.appendChild(text);
-
-  topScreen.appendChild(reloadBox);
+  box.appendChild(button);
+  box.appendChild(note);
+  topScreen.appendChild(box);
 }
 
 showHardReloadButton();
 
 
-// -------------------------
+// ==============================
 // 基本状態
-// -------------------------
-
+// ==============================
 let currentRoomId = null;
 let playerName = null;
 let currentTopic = null;
 
+let currentPlayers = [];
+let currentRoomData = null;
+
+let pendingAction = null;
+let onlineTopicHandled = false;
+
 let drawingPhase = 1;
+let phaseEnding = false;
 
 let timerAnimationId = null;
 let phaseStartTime = 0;
 let phaseDurationMs = 0;
-let phaseEnding = false;
 
 let reviewTimerAnimationId = null;
 let reviewStartTime = 0;
@@ -111,10 +115,7 @@ let reviewDurationMs = 0;
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
 
-let onlineTopicHandled = false;
-let currentPlayers = [];
-let currentRoomData = null;
-
+let reviewGalleryUnsubscribe = null;
 
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
@@ -123,198 +124,82 @@ const FINAL_DISCUSSION_SECONDS = 60;
 
 const LOGICAL_CANVAS_SIZE = 1000;
 
+
+// ==============================
+// DOM
+// ==============================
 const canvas = document.getElementById("drawing-canvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas ? canvas.getContext("2d") : null;
 
 let isDrawing = false;
 let strokes = [];
 let currentStroke = null;
-
 let selectedColor = "#000000";
 let selectedWidth = 10;
 
-// -------------------------
-// デバッグ・通信補助
-// -------------------------
 
-function withTimeout(promise, ms, message) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(message));
-      }, ms);
-    })
-  ]);
+// ==============================
+// 汎用関数
+// ==============================
+function $(id) {
+  return document.getElementById(id);
 }
 
-function getErrorText(error) {
-  if (!error) return "不明なエラー";
+function showScreen(screenId) {
+  document.querySelectorAll(".screen").forEach((screen) => {
+    screen.classList.remove("active");
+  });
 
-  return (
-    "エラーコード:\n" +
-    (error.code || "コードなし") +
-    "\n\n" +
-    "エラー内容:\n" +
-    (error.message || String(error))
-  );
+  const target = $(screenId);
+  if (target) {
+    target.classList.add("active");
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function requireGameDB() {
   if (!window.GameDB) {
     alert(
-      "通信の準備がまだできていません。\n\n" +
-      "firebase.js が読み込まれていない可能性があります。\n" +
-      "index.html の script 順番を確認してください。"
+      "通信機能の読み込みに失敗しました。\n\n" +
+      "確認してください：\n" +
+      "1. firebase.js が v615 で読み込まれているか\n" +
+      "2. index.html の script 順番が正しいか\n" +
+      "3. Firebase SDK が読み込まれているか"
     );
-    return false;
+    throw new Error("GameDB is not loaded");
   }
 
-  return true;
-}
-
-// -------------------------
-// キャンバス初期化
-// -------------------------
-
-function initCanvasOnce() {
-  const dpr = window.devicePixelRatio || 1;
-
-  canvas.width = LOGICAL_CANVAS_SIZE * dpr;
-  canvas.height = LOGICAL_CANVAS_SIZE * dpr;
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  applyCanvasStyle();
-  clearCanvasOnly();
-}
-
-function applyCanvasStyle() {
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = selectedColor;
-  ctx.lineWidth = selectedWidth;
-}
-
-initCanvasOnce();
-
-// -------------------------
-// 共通UI
-// -------------------------
-
-function flashButton(button) {
-  if (!button) return;
-
-  button.classList.remove("pressed-pop");
-
-  requestAnimationFrame(() => {
-    button.classList.add("pressed-pop");
-
-    setTimeout(() => {
-      button.classList.remove("pressed-pop");
-    }, 120);
-  });
-}
-
-function showScreen(screenId) {
-  const screens = document.querySelectorAll(".screen");
-
-  screens.forEach((screen) => {
-    screen.classList.remove("active");
-  });
-
-  const targetScreen = document.getElementById(screenId);
-
-  if (!targetScreen) {
-    console.error("screen not found:", screenId);
-    return;
-  }
-
-  targetScreen.classList.add("active");
-
-  if (screenId === "drawing-screen") {
-    requestAnimationFrame(() => {
-      redrawCanvas();
-    });
-  }
-
-  window.scrollTo(0, 0);
+  return window.GameDB;
 }
 
 function createRoomId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let id = "";
+  let result = "";
 
   for (let i = 0; i < 5; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
+    result += chars[Math.floor(Math.random() * chars.length)];
   }
 
-  return id;
+  return result;
 }
 
-function pickRandomTopic() {
-  if (!window.TOPICS && typeof TOPICS === "undefined") {
-    console.warn("TOPICS が見つかりません。仮のお題を使います。");
-    return {
-      majority: "猫",
-      minority: "虎"
-    };
-  }
-
-  return TOPICS[Math.floor(Math.random() * TOPICS.length)];
+function normalizeRoomInput(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 }
 
-function addPlayerToLobby(name) {
-  const playersList = document.getElementById("players-list");
-  playersList.innerHTML = "";
-
-  const li = document.createElement("li");
-  li.textContent = "🎨 " + name + "（あなた）";
-  playersList.appendChild(li);
-}
-
-// -------------------------
-// オンライン同期：ロビー表示
-// -------------------------
-
-function showOnlineMessage(message) {
-  console.log(message);
-
-  const lobbyNote = document.querySelector("#lobby-screen .note");
-
-  if (lobbyNote) {
-    lobbyNote.textContent = message;
-  }
-}
-
-function renderOnlinePlayers(players) {
-  const playersList = document.getElementById("players-list");
-  playersList.innerHTML = "";
-
-  if (!players || players.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "参加者を待っています";
-    playersList.appendChild(li);
-    return;
-  }
-
-  const myUid = window.GameDB ? window.GameDB.getCurrentUid() : null;
-
-  players.forEach((player) => {
-    const li = document.createElement("li");
-
-    const isMe = player.uid === myUid;
-    const readyText = player.ready ? " ✅" : "";
-
-    li.textContent =
-      "🎨 " +
-      player.name +
-      (isMe ? "（あなた）" : "") +
-      readyText;
-
-    playersList.appendChild(li);
-  });
-}
 function getMyUidSafe() {
   if (!window.GameDB || !window.GameDB.getCurrentUid) return null;
   return window.GameDB.getCurrentUid();
@@ -334,7 +219,6 @@ function getGuestPlayers() {
 function areAllGuestsReady() {
   const guestPlayers = getGuestPlayers();
 
-  // ホスト以外が1人もいない場合は開始不可
   if (guestPlayers.length <= 0) {
     return false;
   }
@@ -348,9 +232,59 @@ function canHostStartGame() {
   return areAllGuestsReady();
 }
 
+function pickRandomTopic() {
+  try {
+    if (typeof getRandomTopic === "function") {
+      return getRandomTopic();
+    }
+
+    if (typeof pickTopic === "function") {
+      return pickTopic();
+    }
+
+    if (typeof pickRandomTheme === "function") {
+      return pickRandomTheme();
+    }
+
+    if (Array.isArray(window.TOPICS) && window.TOPICS.length > 0) {
+      return window.TOPICS[Math.floor(Math.random() * window.TOPICS.length)];
+    }
+
+    if (typeof TOPICS !== "undefined" && Array.isArray(TOPICS) && TOPICS.length > 0) {
+      return TOPICS[Math.floor(Math.random() * TOPICS.length)];
+    }
+  } catch (error) {
+    console.error("お題取得エラー:", error);
+  }
+
+  return "猫";
+}
+
+function topicToText(topic) {
+  if (topic == null) return "？？？";
+
+  if (typeof topic === "string") {
+    return topic;
+  }
+
+  if (typeof topic === "object") {
+    if (topic.word) return topic.word;
+    if (topic.topic) return topic.topic;
+    if (topic.name) return topic.name;
+    if (topic.normal) return topic.normal;
+    if (topic.answer) return topic.answer;
+  }
+
+  return String(topic);
+}
+
+
+// ==============================
+// ロビー制御
+// ==============================
 function updateLobbyControlButtons() {
-  const startBtn = document.getElementById("start-game-btn");
-  const readyBtn = document.getElementById("ready-btn");
+  const startBtn = $("start-game-btn");
+  const readyBtn = $("ready-btn");
 
   const isHost = isCurrentUserHost();
   const canStart = canHostStartGame();
@@ -373,7 +307,6 @@ function updateLobbyControlButtons() {
 
   if (readyBtn) {
     if (isHost) {
-      // ホストは準備OKを押さない
       readyBtn.style.display = "none";
     } else {
       readyBtn.style.display = "block";
@@ -392,23 +325,8 @@ function updateLobbyControlButtons() {
   }
 }
 
-
-function startOnlineListeners() {
-  if (!window.GameDB) {
-    console.warn("GameDB がありません。firebase.js を確認してください。");
-    return;
-  }
-
-  if (!currentRoomId) {
-    console.warn("部屋IDがありません。");
-    return;
-  }
-
-  window.GameDB.listenPlayers(currentRoomId, (players) => {
-  currentPlayers = players || [];
-
-  function renderLobbyPlayers(players) {
-  const playerList = document.getElementById("player-list");
+function renderLobbyPlayers(players) {
+  const playerList = $("players-list");
   if (!playerList) return;
 
   playerList.innerHTML = "";
@@ -444,869 +362,352 @@ function startOnlineListeners() {
   updateLobbyControlButtons();
 }
 
-});
 
+// ==============================
+// オンラインリスナー
+// ==============================
+function startOnlineListeners() {
+  if (!currentRoomId) return;
 
-  window.GameDB.listenRoom(currentRoomId, (room) => {
+  const GameDB = requireGameDB();
+
+  if (GameDB.stopListeners) {
+    GameDB.stopListeners();
+  }
+
+  GameDB.listenPlayers(currentRoomId, (players) => {
+    currentPlayers = players || [];
+
+    renderLobbyPlayers(currentPlayers);
+    updateLobbyControlButtons();
+  });
+
+  GameDB.listenRoom(currentRoomId, (room) => {
     currentRoomData = room || null;
     updateLobbyControlButtons();
 
     if (!room) return;
 
-    if (room.status === "topic" && room.topic) {
-      if (!onlineTopicHandled) {
-        onlineTopicHandled = true;
+    if (room.status === "playing" && !onlineTopicHandled) {
+      onlineTopicHandled = true;
 
-        resetRound();
+      currentTopic = room.topic || room.currentTopic || "？？？";
 
-        currentTopic = room.topic;
-
-        document.getElementById("topic-display").textContent = currentTopic.majority;
-
-        showScreen("topic-screen");
-      }
+      showTopicScreen(currentTopic);
     }
   });
 }
 
-// -------------------------
-// お題バッジ
-// -------------------------
 
-function updateDrawingTopicBadge() {
-  const badge = document.getElementById("drawing-topic-badge");
-
-  if (!badge) return;
-
-  if (currentTopic && currentTopic.majority) {
-    badge.textContent = "お題：" + currentTopic.majority;
-  } else {
-    badge.textContent = "お題：？？？";
-  }
-}
-
-// -------------------------
-// みんなの絵ギャラリー
-// -------------------------
-
-function ensureReviewGalleryGrid() {
-  let grid = document.getElementById("review-gallery-grid");
-
-  if (grid) return grid;
-
-  const galleryCard = document.querySelector("#review-screen .gallery-card");
-
-  grid = document.createElement("div");
-  grid.id = "review-gallery-grid";
-  grid.className = "review-gallery-grid";
-
-  if (galleryCard) {
-    galleryCard.insertAdjacentElement("afterend", grid);
-  }
-
-  return grid;
-}
-
-function renderReviewGallery(drawings, phaseLabel) {
-  const grid = ensureReviewGalleryGrid();
-
-  grid.innerHTML = "";
-
-  const title = document.createElement("div");
-  title.className = "review-gallery-title";
-  title.textContent = "みんなの絵：" + phaseLabel;
-  grid.appendChild(title);
-
-  if (!drawings || drawings.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "review-gallery-empty";
-    empty.textContent = "みんなの絵を待っています…";
-    grid.appendChild(empty);
-    return;
-  }
-
-  drawings.forEach((drawing) => {
-    const item = document.createElement("div");
-    item.className = "review-gallery-item";
-
-    const name = document.createElement("div");
-    name.className = "review-gallery-name";
-    name.textContent = drawing.name || "名無し";
-
-    const img = document.createElement("img");
-    img.className = "review-gallery-img";
-    img.src = drawing.image;
-    img.alt = (drawing.name || "名無し") + "の絵";
-
-    item.appendChild(name);
-    item.appendChild(img);
-
-    grid.appendChild(item);
-  });
-}
-
-function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
-  if (!window.GameDB || !currentRoomId || !window.GameDB.listenDrawings) {
-    renderReviewGallery(
-      [
-        {
-          name: playerName || "あなた",
-          image: fallbackImage
-        }
-      ],
-      phaseLabel
-    );
-    return;
-  }
-
-  renderReviewGallery([], phaseLabel);
-
-  window.GameDB.listenDrawings(currentRoomId, phase, (drawings) => {
-    renderReviewGallery(drawings, phaseLabel);
-  });
-}
-
-// -------------------------
-// トップ・部屋作成・参加
-// -------------------------
-
-document.getElementById("create-room-btn").addEventListener("click", async (event) => {
-  flashButton(event.currentTarget);
-
-  if (!requireGameDB()) return;
-
-  const button = event.currentTarget;
-
+// ==============================
+// 部屋作成・参加
+// ==============================
+async function createRoomFlow() {
   try {
-    currentRoomId = createRoomId();
-    onlineTopicHandled = false;
+    const GameDB = requireGameDB();
 
-    button.textContent = "みんなと通信中〜";
-    button.disabled = true;
+    await GameDB.signIn();
 
-    console.log("部屋作成開始:", currentRoomId);
+    const roomId = createRoomId();
 
-    await withTimeout(
-      window.GameDB.signIn(),
-      12000,
-      "匿名ログインに時間がかかっています"
-    );
+    currentRoomId = roomId;
+    pendingAction = "create";
 
-    console.log("匿名ログイン成功:", window.GameDB.getCurrentUid());
+    const roomInput = $("room-id-input");
+    if (roomInput) roomInput.value = roomId;
 
-    await withTimeout(
-      window.GameDB.createRoom(currentRoomId),
-      12000,
-      "Firestoreへの部屋作成に時間がかかっています"
-    );
-
-    console.log("部屋作成成功:", currentRoomId);
-
-    button.textContent = "部屋を作る";
-    button.disabled = false;
+    const display = $("room-id-display");
+    if (display) display.textContent = roomId;
 
     showScreen("name-screen");
-
   } catch (error) {
-    console.error("部屋作成エラー:", error);
-
-    button.textContent = "部屋を作る";
-    button.disabled = false;
-
-    alert(
-      "部屋作成に失敗しました。\n\n" +
-      getErrorText(error) +
-      "\n\n" +
-      "確認すること:\n" +
-      "1. firebase.js が v611 で読み込まれているか\n" +
-      "2. Anonymous が有効か\n" +
-      "3. Firestore Rules を Publish 済みか\n" +
-      "4. projectId が nise-eshi-game か"
-    );
-  }
-});
-
-document.getElementById("join-room-btn").addEventListener("click", async (event) => {
-  flashButton(event.currentTarget);
-
-  if (!requireGameDB()) return;
-
-  const inputRoomId = document.getElementById("room-id-input").value.trim().toUpperCase();
-
-  if (!inputRoomId) {
-    alert("部屋コードを入力してください");
-    return;
-  }
-
-  const button = event.currentTarget;
-
-  try {
-    button.textContent = "部屋を確認中…";
-    button.disabled = true;
-
-    await withTimeout(
-      window.GameDB.signIn(),
-      12000,
-      "匿名ログインに時間がかかっています"
-    );
-
-    console.log("参加予定の部屋コード:", inputRoomId);
-
-    // v611ではここで厳密な部屋存在チェックをしない
-    // 名前入力後の joinRoom で最終確認する
-    currentRoomId = inputRoomId;
-    onlineTopicHandled = false;
-
-    button.textContent = "部屋に参加する";
-    button.disabled = false;
-
-    showScreen("name-screen");
-
-  } catch (error) {
-    console.error("部屋参加準備エラー:", error);
-
-    button.textContent = "部屋に参加する";
-    button.disabled = false;
-
+    console.error("部屋作成準備失敗:", error);
     alert(
       "通信に失敗しました。\n\n" +
-      getErrorText(error)
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
     );
   }
-});
+}
 
-document.getElementById("enter-room-btn").addEventListener("click", async (event) => {
-  flashButton(event.currentTarget);
-
-  if (!requireGameDB()) return;
-
-  const nameInput = document.getElementById("player-name-input").value.trim();
-
-  if (!nameInput) {
-    alert("名前を入力してください");
-    return;
-  }
-
-  if (!currentRoomId) {
-    alert("部屋コードがありません。トップに戻ってやり直してください。");
-    return;
-  }
-
-  const button = event.currentTarget;
-
+async function joinRoomFlow() {
   try {
-    button.textContent = "参加中…";
-    button.disabled = true;
+    const GameDB = requireGameDB();
 
-    playerName = nameInput;
+    await GameDB.signIn();
 
-    console.log("入室開始:", currentRoomId, playerName);
+    const input = $("room-id-input");
+    const roomId = normalizeRoomInput(input ? input.value : "");
 
-    await withTimeout(
-      window.GameDB.signIn(),
-      12000,
-      "匿名ログインに時間がかかっています"
+    if (!roomId) {
+      alert("部屋コードを入力してください。");
+      return;
+    }
+
+    if (GameDB.roomExists) {
+      const exists = await GameDB.roomExists(roomId);
+      if (!exists) {
+        alert("その部屋が見つかりませんでした。部屋コードを確認してください。");
+        return;
+      }
+    }
+
+    currentRoomId = roomId;
+    pendingAction = "join";
+
+    const display = $("room-id-display");
+    if (display) display.textContent = roomId;
+
+    showScreen("name-screen");
+  } catch (error) {
+    console.error("部屋参加準備失敗:", error);
+    alert(
+      "通信に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
     );
+  }
+}
 
-    await withTimeout(
-      window.GameDB.joinRoom(currentRoomId, playerName),
-      12000,
-      "Firestoreへの参加登録に時間がかかっています"
-    );
+async function enterRoomFlow() {
+  try {
+    const GameDB = requireGameDB();
 
-    console.log("入室成功:", currentRoomId, playerName);
+    const nameInput = $("player-name-input");
+    const name = String(nameInput ? nameInput.value : "").trim();
 
-    document.getElementById("room-id-display").textContent = currentRoomId;
+    if (!name) {
+      alert("名前を入力してください。");
+      return;
+    }
+
+    if (!currentRoomId) {
+      alert("部屋情報がありません。トップからやり直してください。");
+      showScreen("top-screen");
+      return;
+    }
+
+    playerName = name;
+
+    await GameDB.signIn();
+
+    if (pendingAction === "create") {
+      await GameDB.createRoom(currentRoomId, playerName);
+    } else {
+      await GameDB.joinRoom(currentRoomId, playerName);
+    }
+
+    const display = $("room-id-display");
+    if (display) display.textContent = currentRoomId;
+
+    onlineTopicHandled = false;
 
     showScreen("lobby-screen");
-
-    showOnlineMessage("みんなと通信中〜 参加者を待っています。");
-
     startOnlineListeners();
-
-    button.textContent = "参加する";
-    button.disabled = false;
-
   } catch (error) {
-    console.error("入室エラー:", error);
-
-    button.textContent = "参加する";
-    button.disabled = false;
-
+    console.error("入室失敗:", error);
     alert(
       "参加に失敗しました。\n\n" +
-      "部屋コードが正しいか確認してください。\n\n" +
-      getErrorText(error)
-    );
-  }
-});
-
-// -------------------------
-// ロビー
-// -------------------------
-
-document.getElementById("ready-btn").addEventListener("click", async () => {
-  try {
-    if (!currentRoomId) {
-      alert("部屋情報がありません。");
-      return;
-    }
-
-    if (isCurrentUserHost()) {
-      alert("ホストは準備OKを押す必要はありません。");
-      updateLobbyControlButtons();
-      return;
-    }
-
-    const myUid = getMyUidSafe();
-    const me = currentPlayers.find((player) => player.uid === myUid);
-    const nextReady = !(me && me.ready);
-
-    await window.GameDB.setReady(currentRoomId, nextReady);
-
-    updateLobbyControlButtons();
-
-  } catch (error) {
-    console.error("準備OK失敗:", error);
-    alert(
-      "準備OKの更新に失敗しました。\n\n" +
       "code: " + (error.code || "なし") + "\n" +
       "message: " + (error.message || error)
     );
   }
-});
+}
 
-document.getElementById("start-game-btn").addEventListener("click", async () => {
-  try {
-    if (!currentRoomId) {
-      alert("部屋情報がありません。");
-      return;
-    }
 
-    if (!isCurrentUserHost()) {
-      alert("ゲームを開始できるのはホストだけです。");
-      return;
-    }
+// ==============================
+// お題画面
+// ==============================
+function showTopicScreen(topic) {
+  currentTopic = topic;
 
-    if (currentPlayers.length < 2) {
-      alert("2人以上で開始できます。");
-      return;
-    }
-
-    if (!areAllGuestsReady()) {
-      alert("ホスト以外の全員が準備OKを押すまで開始できません。");
-      return;
-    }
-
-    const topic = pickRandomTopic();
-    currentTopic = topic;
-
-    await window.GameDB.startOnlineGame(currentRoomId, topic);
-
-  } catch (error) {
-    console.error("ゲーム開始失敗:", error);
-    alert(
-      "ゲーム開始に失敗しました。\n\n" +
-      "code: " + (error.code || "なし") + "\n" +
-      "message: " + (error.message || error)
-    );
+  const display = $("topic-display");
+  if (display) {
+    display.textContent = topicToText(topic);
   }
-});
+
+  const badge = $("drawing-topic-badge");
+  if (badge) {
+    badge.textContent = "お題：" + topicToText(topic);
+  }
+
+  showScreen("topic-screen");
+}
 
 
-// -------------------------
-// お題確認
-// -------------------------
+// ==============================
+// キャンバス初期化
+// ==============================
+function initCanvas() {
+  if (!canvas || !ctx) return;
 
-document.getElementById("go-drawing-btn").addEventListener("click", (event) => {
-  flashButton(event.currentTarget);
-  startFirstDrawingPhase();
-});
+  canvas.width = LOGICAL_CANVAS_SIZE;
+  canvas.height = LOGICAL_CANVAS_SIZE;
 
-// -------------------------
-// ラウンド初期化
-// -------------------------
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
-function resetRound() {
-  drawingPhase = 1;
+  clearCanvasOnly();
+}
 
-  midImageDataUrl = null;
-  finalImageDataUrl = null;
+function clearCanvasOnly() {
+  if (!canvas || !ctx) return;
 
-  isDrawing = false;
-  strokes = [];
-  currentStroke = null;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
 
-  phaseEnding = false;
+function redrawCanvas() {
+  if (!canvas || !ctx) return;
 
-  stopDrawingCountdown();
-  stopReviewCountdown();
-
-  hideTimeupOverlay();
   clearCanvasOnly();
 
-  updateDrawingTopicBadge();
-}
+  strokes.forEach((stroke) => {
+    if (!stroke || !stroke.points || stroke.points.length < 1) return;
 
-// -------------------------
-// お絵描きカウントダウン
-// -------------------------
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-function startDrawingCountdown(seconds, onEnd) {
-  stopDrawingCountdown();
+    ctx.beginPath();
 
-  phaseEnding = false;
-  phaseDurationMs = seconds * 1000;
-  phaseStartTime = performance.now();
+    stroke.points.forEach((point, index) => {
+      if (index === 0) {
+        ctx.moveTo(point.x, point.y);
+      } else {
+        ctx.lineTo(point.x, point.y);
+      }
+    });
 
-  updateDrawingCountdownDisplay(seconds, 1);
-
-  function tick(now) {
-    const elapsed = now - phaseStartTime;
-    const remainingMs = Math.max(0, phaseDurationMs - elapsed);
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const progressRatio = Math.max(0, Math.min(1, remainingMs / phaseDurationMs));
-
-    updateDrawingCountdownDisplay(remainingSeconds, progressRatio);
-
-    if (remainingMs <= 0) {
-      stopDrawingCountdown();
-      onEnd();
-      return;
-    }
-
-    timerAnimationId = requestAnimationFrame(tick);
-  }
-
-  timerAnimationId = requestAnimationFrame(tick);
-}
-
-function stopDrawingCountdown() {
-  if (timerAnimationId !== null) {
-    cancelAnimationFrame(timerAnimationId);
-    timerAnimationId = null;
-  }
-}
-
-function updateDrawingCountdownDisplay(seconds, progressRatio) {
-  const timerDisplay = document.getElementById("timer-display");
-  const timerProgress = document.getElementById("timer-progress");
-
-  timerDisplay.textContent = String(seconds);
-  timerProgress.style.transform = `scaleX(${progressRatio})`;
-
-  if (seconds <= 5) {
-    timerProgress.style.background = "linear-gradient(90deg, #ff3b3b, #ff9b9b)";
-  } else {
-    timerProgress.style.background = "linear-gradient(90deg, #ff7f7f, #ffcf5c)";
-  }
-}
-
-// -------------------------
-// 討論カウントダウン
-// -------------------------
-
-function startReviewCountdown(seconds, label, onEnd) {
-  stopReviewCountdown();
-
-  reviewDurationMs = seconds * 1000;
-  reviewStartTime = performance.now();
-
-  const labelEl = document.getElementById("review-timer-label");
-  const displayEl = document.getElementById("review-timer-display");
-  const progressEl = document.getElementById("review-progress");
-
-  if (!labelEl || !displayEl || !progressEl) {
-    console.error("review timer elements not found");
-    return;
-  }
-
-  labelEl.textContent = label;
-
-  updateReviewCountdownDisplay(seconds, 1);
-
-  function tick(now) {
-    const elapsed = now - reviewStartTime;
-    const remainingMs = Math.max(0, reviewDurationMs - elapsed);
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const progressRatio = Math.max(0, Math.min(1, remainingMs / reviewDurationMs));
-
-    updateReviewCountdownDisplay(remainingSeconds, progressRatio);
-
-    if (remainingMs <= 0) {
-      stopReviewCountdown();
-      onEnd();
-      return;
-    }
-
-    reviewTimerAnimationId = requestAnimationFrame(tick);
-  }
-
-  reviewTimerAnimationId = requestAnimationFrame(tick);
-}
-
-function stopReviewCountdown() {
-  if (reviewTimerAnimationId !== null) {
-    cancelAnimationFrame(reviewTimerAnimationId);
-    reviewTimerAnimationId = null;
-  }
-}
-
-function updateReviewCountdownDisplay(seconds, progressRatio) {
-  const display = document.getElementById("review-timer-display");
-  const progress = document.getElementById("review-progress");
-
-  if (!display || !progress) return;
-
-  display.textContent = String(seconds);
-  progress.style.transform = `scaleX(${progressRatio})`;
-
-  if (seconds <= 5) {
-    progress.style.background = "linear-gradient(90deg, #ff3b3b, #ff9b9b)";
-  } else {
-    progress.style.background = "linear-gradient(90deg, #8fd3ff, #ffcf5c)";
-  }
-}
-
-// -------------------------
-// お絵描きフェーズ
-// -------------------------
-
-function startFirstDrawingPhase() {
-  drawingPhase = 1;
-
-  hideTimeupOverlay();
-  updateDrawingTopicBadge();
-
-  document.getElementById("drawing-phase-label").textContent = "前半お絵描き";
-  document.getElementById("drawing-title").textContent = "まずは15秒で描こう";
-  document.getElementById("drawing-help").textContent =
-    "15秒で一度見せ合います。ゲージがなくなったら強制的に公開されます。";
-
-  document.getElementById("finish-drawing-btn").style.display = "none";
-
-  showScreen("drawing-screen");
-
-  startDrawingCountdown(FIRST_DRAW_SECONDS, () => {
-    forceFinishCurrentDrawingPhase();
+    ctx.stroke();
   });
 }
 
-function startSecondDrawingPhase() {
-  drawingPhase = 2;
-
-  hideTimeupOverlay();
-  updateDrawingTopicBadge();
-
-  document.getElementById("drawing-phase-label").textContent = "後半お絵描き";
-  document.getElementById("drawing-title").textContent = "残り25秒で仕上げよう";
-  document.getElementById("drawing-help").textContent =
-    "途中討論をふまえて描き足しましょう。ゲージがなくなったら強制終了です。";
-
-  document.getElementById("finish-drawing-btn").style.display = "none";
-
-  showScreen("drawing-screen");
-
-  startDrawingCountdown(SECOND_DRAW_SECONDS, () => {
-    forceFinishCurrentDrawingPhase();
-  });
-}
-
-document.getElementById("finish-drawing-btn").addEventListener("click", () => {
-  forceFinishCurrentDrawingPhase();
-});
-
-function forceFinishCurrentDrawingPhase() {
-  if (phaseEnding) return;
-
-  phaseEnding = true;
-
-  stopDrawingCountdown();
-  stopDrawing();
-
-  redrawCanvas();
-  showTimeupOverlay();
-
-  setTimeout(async () => {
-    redrawCanvas();
-
-    if (drawingPhase === 1) {
-      midImageDataUrl = getCanvasImage();
-
-      if (window.GameDB && currentRoomId && window.GameDB.saveDrawing) {
-        try {
-          await window.GameDB.saveDrawing(
-            currentRoomId,
-            "mid",
-            playerName || "名無し",
-            midImageDataUrl
-          );
-        } catch (error) {
-          console.error("途中絵の保存に失敗:", error);
-          alert("途中絵の共有に失敗しました。\n自分の画面では続行します。");
-        }
-      }
-
-      showMidReview();
-    } else {
-      finalImageDataUrl = getCanvasImage();
-
-      if (window.GameDB && currentRoomId && window.GameDB.saveDrawing) {
-        try {
-          await window.GameDB.saveDrawing(
-            currentRoomId,
-            "final",
-            playerName || "名無し",
-            finalImageDataUrl
-          );
-        } catch (error) {
-          console.error("完成絵の保存に失敗:", error);
-          alert("完成絵の共有に失敗しました。\n自分の画面では続行します。");
-        }
-      }
-
-      showFinalReview();
-    }
-  }, 500);
-}
-
-function showTimeupOverlay() {
-  const overlay = document.getElementById("timeup-overlay");
-  const sfx = document.getElementById("timeup-sfx");
-
-  const sfxList = ["ドン！", "バーン！", "ジャーン！", "カン！", "ドドン！"];
-  const randomSfx = sfxList[Math.floor(Math.random() * sfxList.length)];
-
-  if (sfx) {
-    sfx.textContent = randomSfx;
-  }
-
-  if (overlay) {
-    overlay.classList.add("show");
-  }
-}
-
-function hideTimeupOverlay() {
-  const overlay = document.getElementById("timeup-overlay");
-
-  if (overlay) {
-    overlay.classList.remove("show");
-  }
-}
-
-// -------------------------
-// ペン設定
-// -------------------------
-
-document.addEventListener("pointerdown", (event) => {
-  const colorButton = event.target.closest(".color-btn");
-  const sizeButton = event.target.closest(".size-btn");
-
-  if (colorButton) {
-    event.preventDefault();
-
-    if (phaseEnding) return;
-
-    selectedColor = colorButton.dataset.color;
-
-    document.querySelectorAll(".color-btn").forEach((btn) => {
-      btn.classList.remove("selected");
-    });
-
-    colorButton.classList.add("selected");
-    flashButton(colorButton);
-
-    console.log("selectedColor:", selectedColor);
-    return;
-  }
-
-  if (sizeButton) {
-    event.preventDefault();
-
-    if (phaseEnding) return;
-
-    selectedWidth = Number(sizeButton.dataset.size);
-
-    document.querySelectorAll(".size-btn").forEach((btn) => {
-      btn.classList.remove("selected");
-    });
-
-    sizeButton.classList.add("selected");
-    flashButton(sizeButton);
-
-    console.log("selectedWidth:", selectedWidth);
-    return;
-  }
-}, { passive: false });
-
-document.addEventListener("click", (event) => {
-  const colorButton = event.target.closest(".color-btn");
-  const sizeButton = event.target.closest(".size-btn");
-
-  if (colorButton) {
-    event.preventDefault();
-
-    if (phaseEnding) return;
-
-    selectedColor = colorButton.dataset.color;
-
-    document.querySelectorAll(".color-btn").forEach((btn) => {
-      btn.classList.remove("selected");
-    });
-
-    colorButton.classList.add("selected");
-
-    console.log("selectedColor click:", selectedColor);
-    return;
-  }
-
-  if (sizeButton) {
-    event.preventDefault();
-
-    if (phaseEnding) return;
-
-    selectedWidth = Number(sizeButton.dataset.size);
-
-    document.querySelectorAll(".size-btn").forEach((btn) => {
-      btn.classList.remove("selected");
-    });
-
-    sizeButton.classList.add("selected");
-
-    console.log("selectedWidth click:", selectedWidth);
-    return;
-  }
-});
-
-// -------------------------
-// キャンバス座標
-// -------------------------
-
-function getCanvasPos(event) {
+function getCanvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
 
-  const x = ((event.clientX - rect.left) / rect.width) * LOGICAL_CANVAS_SIZE;
-  const y = ((event.clientY - rect.top) / rect.height) * LOGICAL_CANVAS_SIZE;
+  let clientX;
+  let clientY;
 
-  return { x, y };
+  if (event.touches && event.touches.length > 0) {
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  } else if (event.changedTouches && event.changedTouches.length > 0) {
+    clientX = event.changedTouches[0].clientX;
+    clientY = event.changedTouches[0].clientY;
+  } else {
+    clientX = event.clientX;
+    clientY = event.clientY;
+  }
+
+  return {
+    x: ((clientX - rect.left) / rect.width) * canvas.width,
+    y: ((clientY - rect.top) / rect.height) * canvas.height
+  };
 }
 
-// -------------------------
-// 描画処理
-// -------------------------
-
 function startDrawing(event) {
-  event.preventDefault();
+  if (!canvas || !ctx) return;
 
-  if (phaseEnding) return;
+  event.preventDefault();
 
   isDrawing = true;
 
-  const pos = getCanvasPos(event);
+  const point = getCanvasPoint(event);
 
   currentStroke = {
     color: selectedColor,
     width: selectedWidth,
-    points: [pos]
+    points: [point]
   };
 
-  strokes.push(currentStroke);
+  ctx.strokeStyle = selectedColor;
+  ctx.lineWidth = selectedWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
-  drawDot(pos, currentStroke);
+  ctx.beginPath();
+  ctx.moveTo(point.x, point.y);
 }
 
-function draw(event) {
+function moveDrawing(event) {
+  if (!isDrawing || !currentStroke || !canvas || !ctx) return;
+
   event.preventDefault();
 
-  if (!isDrawing || !currentStroke || phaseEnding) return;
+  const point = getCanvasPoint(event);
+  currentStroke.points.push(point);
 
-  const pos = getCanvasPos(event);
-  const points = currentStroke.points;
-  const lastPos = points[points.length - 1];
-
-  currentStroke.points.push(pos);
-
-  drawLineSegment(lastPos, pos, currentStroke);
-}
-
-function stopDrawing(event) {
-  if (event) {
-    event.preventDefault();
-  }
-
-  isDrawing = false;
-  currentStroke = null;
-}
-
-function drawDot(pos, stroke) {
-  ctx.beginPath();
-  ctx.arc(pos.x, pos.y, stroke.width / 2, 0, Math.PI * 2);
-  ctx.fillStyle = stroke.color;
-  ctx.fill();
-}
-
-function drawLineSegment(from, to, stroke) {
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.lineTo(to.x, to.y);
-
-  ctx.strokeStyle = stroke.color;
-  ctx.lineWidth = stroke.width;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+  ctx.lineTo(point.x, point.y);
   ctx.stroke();
 }
 
-function redrawCanvas() {
-  clearCanvasOnly();
+function endDrawing(event) {
+  if (!isDrawing) return;
 
-  strokes.forEach((stroke) => {
-    drawStroke(stroke);
+  if (event) event.preventDefault();
+
+  isDrawing = false;
+
+  if (currentStroke) {
+    strokes.push(currentStroke);
+    currentStroke = null;
+  }
+}
+
+function setupCanvasEvents() {
+  if (!canvas) return;
+
+  canvas.addEventListener("mousedown", startDrawing);
+  canvas.addEventListener("mousemove", moveDrawing);
+  window.addEventListener("mouseup", endDrawing);
+
+  canvas.addEventListener("touchstart", startDrawing, { passive: false });
+  canvas.addEventListener("touchmove", moveDrawing, { passive: false });
+  canvas.addEventListener("touchend", endDrawing, { passive: false });
+  canvas.addEventListener("touchcancel", endDrawing, { passive: false });
+}
+
+function setupDrawingTools() {
+  document.querySelectorAll(".color-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".color-btn").forEach((btn) => {
+        btn.classList.remove("selected");
+      });
+
+      button.classList.add("selected");
+      selectedColor = button.dataset.color || "#000000";
+    });
   });
-}
 
-function drawStroke(stroke) {
-  if (!stroke.points || stroke.points.length === 0) return;
+  document.querySelectorAll(".size-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".size-btn").forEach((btn) => {
+        btn.classList.remove("selected");
+      });
 
-  if (stroke.points.length === 1) {
-    drawDot(stroke.points[0], stroke);
-    return;
+      button.classList.add("selected");
+      selectedWidth = Number(button.dataset.size || 10);
+    });
+  });
+
+  const undoBtn = $("undo-btn");
+  if (undoBtn) {
+    undoBtn.addEventListener("click", () => {
+      strokes.pop();
+      redrawCanvas();
+    });
   }
 
-  ctx.beginPath();
-  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-
-  for (let i = 1; i < stroke.points.length; i++) {
-    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+  const clearBtn = $("clear-canvas-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (!confirm("絵を消しますか？")) return;
+      strokes = [];
+      redrawCanvas();
+    });
   }
-
-  ctx.strokeStyle = stroke.color;
-  ctx.lineWidth = stroke.width;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.stroke();
-}
-
-function clearCanvasOnly() {
-  ctx.clearRect(0, 0, LOGICAL_CANVAS_SIZE, LOGICAL_CANVAS_SIZE);
-}
-
-function clearCanvasAll() {
-  strokes = [];
-  currentStroke = null;
-  isDrawing = false;
-
-  clearCanvasOnly();
-}
-
-function undoStroke() {
-  if (phaseEnding) return;
-
-  strokes.pop();
-  currentStroke = null;
-  isDrawing = false;
-
-  redrawCanvas();
 }
 
 function getCanvasImage() {
@@ -1318,14 +719,11 @@ function getCanvasImage() {
 
   const tempCtx = tempCanvas.getContext("2d");
 
-  // 重要：透明背景を白で埋める
   tempCtx.fillStyle = "#ffffff";
   tempCtx.fillRect(0, 0, exportSize, exportSize);
 
-  // 元キャンバスを白背景の上に描画
   tempCtx.drawImage(canvas, 0, 0, exportSize, exportSize);
 
-  // JPEGで軽量保存
   const imageDataUrl = tempCanvas.toDataURL("image/jpeg", 0.55);
 
   console.log("共有用画像サイズ:", Math.round(imageDataUrl.length / 1024), "KB");
@@ -1334,257 +732,570 @@ function getCanvasImage() {
 }
 
 
-// -------------------------
-// キャンバスイベント
-// -------------------------
+// ==============================
+// 描画フェーズ
+// ==============================
+function startFirstDrawing() {
+  drawingPhase = 1;
+  phaseEnding = false;
+  strokes = [];
 
-canvas.addEventListener("pointerdown", startDrawing, { passive: false });
-canvas.addEventListener("pointermove", draw, { passive: false });
-canvas.addEventListener("pointerup", stopDrawing, { passive: false });
-canvas.addEventListener("pointercancel", stopDrawing, { passive: false });
-canvas.addEventListener("pointerleave", stopDrawing, { passive: false });
+  initCanvas();
 
-document.getElementById("clear-canvas-btn").addEventListener("click", (event) => {
-  if (phaseEnding) return;
+  const phaseLabel = $("drawing-phase-label");
+  if (phaseLabel) phaseLabel.textContent = "前半お絵描き";
 
-  flashButton(event.currentTarget);
-  clearCanvasAll();
-});
+  const title = $("drawing-title");
+  if (title) title.textContent = "まずは15秒で描こう";
 
-document.getElementById("undo-btn").addEventListener("click", (event) => {
-  if (phaseEnding) return;
+  const help = $("drawing-help");
+  if (help) help.textContent = "15秒で一度見せ合います。描きすぎ注意！";
 
-  flashButton(event.currentTarget);
-  undoStroke();
-});
+  const topicBadge = $("drawing-topic-badge");
+  if (topicBadge) topicBadge.textContent = "お題：" + topicToText(currentTopic);
 
-window.addEventListener("resize", () => {
-  if (document.getElementById("drawing-screen").classList.contains("active")) {
-    redrawCanvas();
+  const finishBtn = $("finish-drawing-btn");
+  if (finishBtn) finishBtn.textContent = "この段階を完了";
+
+  showScreen("drawing-screen");
+
+  startDrawingTimer(FIRST_DRAW_SECONDS);
+}
+
+function startSecondDrawing() {
+  drawingPhase = 2;
+  phaseEnding = false;
+
+  const phaseLabel = $("drawing-phase-label");
+  if (phaseLabel) phaseLabel.textContent = "後半お絵描き";
+
+  const title = $("drawing-title");
+  if (title) title.textContent = "あと25秒で仕上げよう";
+
+  const help = $("drawing-help");
+  if (help) help.textContent = "途中討論をヒントに、続きを描きましょう。";
+
+  const topicBadge = $("drawing-topic-badge");
+  if (topicBadge) topicBadge.textContent = "お題：" + topicToText(currentTopic);
+
+  const finishBtn = $("finish-drawing-btn");
+  if (finishBtn) finishBtn.textContent = "完成";
+
+  showScreen("drawing-screen");
+
+  startDrawingTimer(SECOND_DRAW_SECONDS);
+}
+
+function startDrawingTimer(seconds) {
+  cancelAnimationFrame(timerAnimationId);
+
+  phaseStartTime = performance.now();
+  phaseDurationMs = seconds * 1000;
+
+  const display = $("timer-display");
+  const progress = $("timer-progress");
+
+  function tick(now) {
+    const elapsed = now - phaseStartTime;
+    const remainMs = Math.max(0, phaseDurationMs - elapsed);
+    const remainSec = Math.ceil(remainMs / 1000);
+
+    if (display) display.textContent = String(remainSec);
+
+    if (progress) {
+      const ratio = Math.max(0, Math.min(1, remainMs / phaseDurationMs));
+      progress.style.width = `${ratio * 100}%`;
+    }
+
+    if (remainMs <= 0) {
+      forceFinishCurrentDrawingPhase();
+      return;
+    }
+
+    timerAnimationId = requestAnimationFrame(tick);
   }
-});
 
-// -------------------------
-// 途中公開・最終公開
-// -------------------------
+  timerAnimationId = requestAnimationFrame(tick);
+}
 
+async function forceFinishCurrentDrawingPhase() {
+  if (phaseEnding) return;
+
+  phaseEnding = true;
+  cancelAnimationFrame(timerAnimationId);
+
+  const overlay = $("timeup-overlay");
+  if (overlay) overlay.classList.add("active");
+
+  await new Promise((resolve) => setTimeout(resolve, 600));
+
+  if (overlay) overlay.classList.remove("active");
+
+  const image = getCanvasImage();
+
+  if (drawingPhase === 1) {
+    midImageDataUrl = image;
+
+    await saveDrawingOnline("mid", midImageDataUrl);
+
+    showMidReview();
+  } else {
+    finalImageDataUrl = image;
+
+    await saveDrawingOnline("final", finalImageDataUrl);
+
+    showFinalReview();
+  }
+}
+
+async function saveDrawingOnline(phase, imageDataUrl) {
+  try {
+    if (!currentRoomId) return;
+    if (!window.GameDB || !window.GameDB.saveDrawing) return;
+
+    await window.GameDB.saveDrawing(
+      currentRoomId,
+      phase,
+      playerName || "名無し",
+      imageDataUrl
+    );
+  } catch (error) {
+    console.error(`${phase}絵の共有に失敗:`, error);
+    alert(
+      (phase === "mid" ? "途中絵" : "完成絵") +
+      "の共有に失敗しました。\n自分の画面では続行します。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
+    );
+  }
+}
+
+
+// ==============================
+// みんなの絵ギャラリー
+// ==============================
+function ensureReviewGalleryGrid() {
+  let grid = $("review-gallery-grid");
+
+  if (grid) return grid;
+
+  const galleryCard = document.querySelector("#review-screen .gallery-card");
+  if (!galleryCard) return null;
+
+  grid = document.createElement("div");
+  grid.id = "review-gallery-grid";
+  grid.className = "review-gallery-grid";
+
+  galleryCard.insertAdjacentElement("afterend", grid);
+
+  return grid;
+}
+
+function renderReviewGallery(drawings, phaseLabel, fallbackImage) {
+  const grid = ensureReviewGalleryGrid();
+  if (!grid) return;
+
+  const list = Array.isArray(drawings) ? drawings : [];
+
+  let html = `
+    <div class="review-gallery-title">みんなの絵：${escapeHtml(phaseLabel)}</div>
+  `;
+
+  if (list.length === 0 && fallbackImage) {
+    html += `
+      <div class="review-gallery-card">
+        <div class="review-gallery-name">${escapeHtml(playerName || "あなた")}</div>
+        <img class="review-gallery-image" src="${fallbackImage}" alt="あなたの絵">
+      </div>
+    `;
+  } else if (list.length === 0) {
+    html += `
+      <div class="review-gallery-empty">
+        みんなの絵を読み込み中...
+      </div>
+    `;
+  } else {
+    html += `<div class="review-gallery-list">`;
+
+    list.forEach((drawing) => {
+      html += `
+        <div class="review-gallery-card">
+          <div class="review-gallery-name">${escapeHtml(drawing.name || "名無し")}</div>
+          <img class="review-gallery-image" src="${drawing.image}" alt="${escapeHtml(drawing.name || "名無し")}の絵">
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
+  if (reviewGalleryUnsubscribe) {
+    try {
+      reviewGalleryUnsubscribe();
+    } catch (error) {
+      console.warn("前のギャラリーリスナー停止失敗:", error);
+    }
+    reviewGalleryUnsubscribe = null;
+  }
+
+  renderReviewGallery([], phaseLabel, fallbackImage);
+
+  if (!currentRoomId) return;
+  if (!window.GameDB || !window.GameDB.listenDrawings) return;
+
+  try {
+    reviewGalleryUnsubscribe = window.GameDB.listenDrawings(
+      currentRoomId,
+      phase,
+      (drawings) => {
+        renderReviewGallery(drawings || [], phaseLabel, fallbackImage);
+      }
+    );
+  } catch (error) {
+    console.error("絵ギャラリー購読失敗:", error);
+  }
+}
+
+
+// ==============================
+// 公開・討論
+// ==============================
 function showMidReview() {
-  hideTimeupOverlay();
+  const phaseLabel = $("review-phase-label");
+  if (phaseLabel) phaseLabel.textContent = "途中公開";
 
-  document.getElementById("review-phase-label").textContent = "途中公開";
-  document.getElementById("review-title").textContent = "途中経過を見せ合おう";
-  document.getElementById("review-description").textContent =
-    "60秒だけ軽く討論します。誰が怪しいか探りましょう。";
+  const title = $("review-title");
+  if (title) title.textContent = "途中経過を見せ合おう";
 
-  document.getElementById("gallery-player-name").textContent =
-    (playerName || "あなた") + " の途中絵";
+  const description = $("review-description");
+  if (description) {
+    description.textContent = "軽く話し合って、怪しい人を探しましょう。";
+  }
 
-  document.getElementById("review-image").src = midImageDataUrl;
+  const timerLabel = $("review-timer-label");
+  if (timerLabel) timerLabel.textContent = "途中討論";
 
-  document.getElementById("discussion-text").innerHTML =
-    "途中討論タイム！<br>ただし、お題を直接言うのは禁止！";
+  const image = $("review-image");
+  if (image) image.src = midImageDataUrl || "";
 
-  const nextBtn = document.getElementById("review-next-btn");
-  nextBtn.textContent = "60秒後に後半へ進みます";
-  nextBtn.disabled = true;
+  const name = $("gallery-player-name");
+  if (name) name.textContent = playerName ? `${playerName}の絵` : "あなたの絵";
+
+  const nextBtn = $("review-next-btn");
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.textContent = "自動で進みます";
+  }
 
   showScreen("review-screen");
 
   startDrawingGalleryListener("mid", "途中絵", midImageDataUrl);
 
-  setTimeout(() => {
-    startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
-      startSecondDrawingPhase();
-    });
-  }, 50);
+  startReviewTimer(MID_DISCUSSION_SECONDS, () => {
+    startSecondDrawing();
+  });
 }
 
 function showFinalReview() {
-  hideTimeupOverlay();
+  const phaseLabel = $("review-phase-label");
+  if (phaseLabel) phaseLabel.textContent = "最終公開";
 
-  document.getElementById("review-phase-label").textContent = "最終公開";
-  document.getElementById("review-title").textContent = "完成した絵を見せ合おう";
-  document.getElementById("review-description").textContent =
-    "60秒の最終討論です。ニセ絵師だと思う人を決めましょう。";
+  const title = $("review-title");
+  if (title) title.textContent = "完成した絵を見せ合おう";
 
-  document.getElementById("gallery-player-name").textContent =
-    (playerName || "あなた") + " の完成絵";
+  const description = $("review-description");
+  if (description) {
+    description.textContent = "最後の話し合いです。ニセ絵師を探しましょう。";
+  }
 
-  document.getElementById("review-image").src = finalImageDataUrl;
+  const timerLabel = $("review-timer-label");
+  if (timerLabel) timerLabel.textContent = "最終討論";
 
-  document.getElementById("discussion-text").innerHTML =
-    "最終討論タイム！<br>絵の違和感や発言からニセ絵師を探しましょう。";
+  const image = $("review-image");
+  if (image) image.src = finalImageDataUrl || "";
 
-  const nextBtn = document.getElementById("review-next-btn");
-  nextBtn.textContent = "60秒後に投票へ進みます";
-  nextBtn.disabled = true;
+  const name = $("gallery-player-name");
+  if (name) name.textContent = playerName ? `${playerName}の絵` : "あなたの絵";
+
+  const nextBtn = $("review-next-btn");
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.textContent = "自動で進みます";
+  }
 
   showScreen("review-screen");
 
   startDrawingGalleryListener("final", "完成絵", finalImageDataUrl);
 
-  setTimeout(() => {
-    startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
-      showVoteScreen();
-    });
-  }, 50);
+  startReviewTimer(FINAL_DISCUSSION_SECONDS, () => {
+    showVoteScreen();
+  });
 }
 
-// -------------------------
-// 投票
-// -------------------------
+function startReviewTimer(seconds, onFinish) {
+  cancelAnimationFrame(reviewTimerAnimationId);
 
+  reviewStartTime = performance.now();
+  reviewDurationMs = seconds * 1000;
+
+  const display = $("review-timer-display");
+  const progress = $("review-progress");
+
+  function tick(now) {
+    const elapsed = now - reviewStartTime;
+    const remainMs = Math.max(0, reviewDurationMs - elapsed);
+    const remainSec = Math.ceil(remainMs / 1000);
+
+    if (display) display.textContent = String(remainSec);
+
+    if (progress) {
+      const ratio = Math.max(0, Math.min(1, remainMs / reviewDurationMs));
+      progress.style.width = `${ratio * 100}%`;
+    }
+
+    if (remainMs <= 0) {
+      if (typeof onFinish === "function") onFinish();
+      return;
+    }
+
+    reviewTimerAnimationId = requestAnimationFrame(tick);
+  }
+
+  reviewTimerAnimationId = requestAnimationFrame(tick);
+}
+
+
+// ==============================
+// 投票・結果
+// ==============================
 function showVoteScreen() {
-  stopReviewCountdown();
+  const voteList = $("vote-list");
+  if (!voteList) return;
 
-  showScreen("vote-screen");
-
-  const voteList = document.getElementById("vote-list");
   voteList.innerHTML = "";
 
-  const message = document.createElement("div");
-  message.className = "vote-notice";
-  message.innerHTML = `
-    <p><strong>投票タイム！</strong></p>
-    <p>今はお試しプレイなので、自分の名前を押すと結果発表に進みます。</p>
-    <p class="note">正式版では、みんなの投票が集まってから結果が発表されます。</p>
-  `;
-  voteList.appendChild(message);
+  const players = currentPlayers.length > 0
+    ? currentPlayers
+    : [{ uid: "local", name: playerName || "あなた" }];
 
-  const btn = document.createElement("button");
-  btn.className = "primary-btn";
-  btn.textContent = playerName || "あなた";
+  players.forEach((player) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary-btn vote-btn";
+    button.textContent = player.name || "名無し";
 
-  btn.addEventListener("click", (event) => {
-    flashButton(event.currentTarget);
-    showResultScreen();
+    button.addEventListener("click", () => {
+      showResultScreen(player);
+    });
+
+    voteList.appendChild(button);
   });
 
-  voteList.appendChild(btn);
+  showScreen("vote-screen");
 }
 
-// -------------------------
-// 結果
-// -------------------------
+function showResultScreen(votedPlayer) {
+  const resultDisplay = $("result-display");
 
-function showResultScreen() {
-  const majorityWord = currentTopic ? currentTopic.majority : "猫";
-  const minorityWord = currentTopic ? currentTopic.minority : "虎";
-
-  const resultDisplay = document.getElementById("result-display");
+  if (resultDisplay) {
+    resultDisplay.innerHTML = `
+      <div class="result-message">
+        <p>あなたは</p>
+        <h3>${escapeHtml(votedPlayer.name || "名無し")}</h3>
+        <p>に投票しました。</p>
+      </div>
+      <p class="note">
+        ※v615では投票結果の完全同期は次の段階で実装します。
+      </p>
+    `;
+  }
 
   showScreen("result-screen");
-
-  resultDisplay.innerHTML = `
-    <div class="result-showcase">
-      <div class="result-drumroll">
-        <div class="drumroll-icon">🥁</div>
-        <div class="drumroll-text">集計中……</div>
-        <div class="drumroll-sub">みんなの投票を確認しています</div>
-      </div>
-    </div>
-  `;
-
-  setTimeout(() => {
-    resultDisplay.innerHTML = `
-      <div class="result-showcase">
-
-        <div class="result-burst">🎉 結果発表 🎉</div>
-
-        <div class="result-reveal-card">
-          <div class="result-label">今回のお題</div>
-
-          <div class="topic-versus">
-            <div class="topic-box majority">
-              <span>多数派</span>
-              <strong>${majorityWord}</strong>
-            </div>
-
-            <div class="vs-mark">VS</div>
-
-            <div class="topic-box minority">
-              <span>ニセ絵師</span>
-              <strong>${minorityWord}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="result-winner-card">
-          <div class="winner-icon">🕵️‍♂️</div>
-          <h3>今回はお試し結果です</h3>
-          <p>
-            正式版では、ここに<br>
-            <strong>一番票を集めた人</strong>、<strong>ニセ絵師の正体</strong>、<strong>勝ったチーム</strong><br>
-            がド派手に表示されます。
-          </p>
-        </div>
-
-        <div class="result-mini-stats">
-          <div>
-            <span>投票状況</span>
-            <strong>準備中</strong>
-          </div>
-          <div>
-            <span>通信状態</span>
-            <strong>みんなと通信中〜</strong>
-          </div>
-          <div>
-            <span>次の目標</span>
-            <strong>オンライン対戦</strong>
-          </div>
-        </div>
-
-        <div class="result-notice">
-          <p>
-            今は1人で流れを確認するお試し版です。<br>
-            次のアップデートで、みんなの絵・投票・結果がリアルタイムで反映されるようになります。
-          </p>
-        </div>
-
-      </div>
-    `;
-  }, 1200);
 }
 
-// -------------------------
-// トップへ戻る
-// -------------------------
+function backToTop() {
+  cancelAnimationFrame(timerAnimationId);
+  cancelAnimationFrame(reviewTimerAnimationId);
 
-document.getElementById("back-top-btn").addEventListener("click", (event) => {
-  flashButton(event.currentTarget);
+  if (reviewGalleryUnsubscribe) {
+    try {
+      reviewGalleryUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+    reviewGalleryUnsubscribe = null;
+  }
 
-  if (window.GameDB) {
+  if (window.GameDB && window.GameDB.stopListeners) {
     window.GameDB.stopListeners();
   }
 
   currentRoomId = null;
   playerName = null;
   currentTopic = null;
-
+  currentPlayers = [];
+  currentRoomData = null;
+  pendingAction = null;
   onlineTopicHandled = false;
 
   drawingPhase = 1;
-
-  midImageDataUrl = null;
-  finalImageDataUrl = null;
-
   phaseEnding = false;
 
-  stopDrawingCountdown();
-  stopReviewCountdown();
-
-  isDrawing = false;
   strokes = [];
   currentStroke = null;
 
-  document.getElementById("room-id-input").value = "";
-  document.getElementById("player-name-input").value = "";
-  document.getElementById("players-list").innerHTML = "";
-  document.getElementById("result-display").innerHTML = "";
+  const roomInput = $("room-id-input");
+  if (roomInput) roomInput.value = "";
 
-  hideTimeupOverlay();
-  clearCanvasOnly();
-  updateDrawingTopicBadge();
+  const nameInput = $("player-name-input");
+  if (nameInput) nameInput.value = "";
 
   showScreen("top-screen");
-});
+}
+
+
+// ==============================
+// イベント設定
+// ==============================
+function setupEvents() {
+  const createBtn = $("create-room-btn");
+  if (createBtn) {
+    createBtn.addEventListener("click", createRoomFlow);
+  }
+
+  const joinBtn = $("join-room-btn");
+  if (joinBtn) {
+    joinBtn.addEventListener("click", joinRoomFlow);
+  }
+
+  const enterBtn = $("enter-room-btn");
+  if (enterBtn) {
+    enterBtn.addEventListener("click", enterRoomFlow);
+  }
+
+  const goDrawingBtn = $("go-drawing-btn");
+  if (goDrawingBtn) {
+    goDrawingBtn.addEventListener("click", () => {
+      startFirstDrawing();
+    });
+  }
+
+  const finishDrawingBtn = $("finish-drawing-btn");
+  if (finishDrawingBtn) {
+    finishDrawingBtn.addEventListener("click", () => {
+      forceFinishCurrentDrawingPhase();
+    });
+  }
+
+  const readyBtn = $("ready-btn");
+  if (readyBtn) {
+    readyBtn.addEventListener("click", async () => {
+      try {
+        if (!currentRoomId) {
+          alert("部屋情報がありません。");
+          return;
+        }
+
+        if (isCurrentUserHost()) {
+          alert("ホストは準備OKを押す必要はありません。");
+          updateLobbyControlButtons();
+          return;
+        }
+
+        const GameDB = requireGameDB();
+
+        const myUid = getMyUidSafe();
+        const me = currentPlayers.find((player) => player.uid === myUid);
+        const nextReady = !(me && me.ready);
+
+        await GameDB.setReady(currentRoomId, nextReady);
+
+        updateLobbyControlButtons();
+      } catch (error) {
+        console.error("準備OK失敗:", error);
+        alert(
+          "準備OKの更新に失敗しました。\n\n" +
+          "code: " + (error.code || "なし") + "\n" +
+          "message: " + (error.message || error)
+        );
+      }
+    });
+  }
+
+  const startGameBtn = $("start-game-btn");
+  if (startGameBtn) {
+    startGameBtn.addEventListener("click", async () => {
+      try {
+        if (!currentRoomId) {
+          alert("部屋情報がありません。");
+          return;
+        }
+
+        if (!isCurrentUserHost()) {
+          alert("ゲームを開始できるのはホストだけです。");
+          return;
+        }
+
+        if (currentPlayers.length < 2) {
+          alert("2人以上で開始できます。");
+          return;
+        }
+
+        if (!areAllGuestsReady()) {
+          alert("ホスト以外の全員が準備OKを押すまで開始できません。");
+          return;
+        }
+
+        const GameDB = requireGameDB();
+
+        const topic = pickRandomTopic();
+
+        if (!topic) {
+          alert("お題の取得に失敗しました。topics.jsを確認してください。");
+          return;
+        }
+
+        currentTopic = topic;
+
+        await GameDB.startOnlineGame(currentRoomId, topic);
+      } catch (error) {
+        console.error("ゲーム開始失敗:", error);
+        alert(
+          "ゲーム開始に失敗しました。\n\n" +
+          "code: " + (error.code || "なし") + "\n" +
+          "message: " + (error.message || error)
+        );
+      }
+    });
+  }
+
+  const backTopBtn = $("back-top-btn");
+  if (backTopBtn) {
+    backTopBtn.addEventListener("click", backToTop);
+  }
+}
+
+
+// ==============================
+// 初期化
+// ==============================
+function initApp() {
+  initCanvas();
+  setupCanvasEvents();
+  setupDrawingTools();
+  setupEvents();
+
+  showScreen("top-screen");
+
+  setTimeout(() => {
+    updateLobbyControlButtons();
+  }, 300);
+
+  console.log("app.js v615 initialized");
+}
+
+document.addEventListener("DOMContentLoaded", initApp);
