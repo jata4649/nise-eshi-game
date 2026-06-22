@@ -1,4 +1,28 @@
-console.log("app.js loaded");
+console.log("app.js version 500 loaded");
+
+// -------------------------
+// バージョン確認表示
+// -------------------------
+
+function showVersionBadge() {
+  const badge = document.createElement("div");
+  badge.textContent = "v500";
+  badge.style.position = "fixed";
+  badge.style.right = "8px";
+  badge.style.bottom = "8px";
+  badge.style.zIndex = "9999";
+  badge.style.padding = "4px 8px";
+  badge.style.fontSize = "12px";
+  badge.style.fontWeight = "bold";
+  badge.style.color = "#2b2118";
+  badge.style.background = "#ffcf5c";
+  badge.style.border = "2px solid #2b2118";
+  badge.style.borderRadius = "999px";
+  badge.style.pointerEvents = "none";
+  document.body.appendChild(badge);
+}
+
+showVersionBadge();
 
 // -------------------------
 // 基本状態
@@ -90,6 +114,12 @@ function showScreen(screenId) {
   });
 
   const targetScreen = document.getElementById(screenId);
+
+  if (!targetScreen) {
+    console.error("screen not found:", screenId);
+    return;
+  }
+
   targetScreen.classList.add("active");
 
   if (screenId === "drawing-screen") {
@@ -131,6 +161,7 @@ function addPlayerToLobby(name) {
 
 document.getElementById("create-room-btn").addEventListener("click", (event) => {
   flashButton(event.currentTarget);
+
   currentRoomId = createRoomId();
   showScreen("name-screen");
 });
@@ -212,6 +243,7 @@ function resetRound() {
   currentStroke = null;
 
   phaseEnding = false;
+
   stopDrawingCountdown();
   stopReviewCountdown();
 
@@ -283,7 +315,16 @@ function startReviewCountdown(seconds, label, onEnd) {
   reviewDurationMs = seconds * 1000;
   reviewStartTime = performance.now();
 
-  document.getElementById("review-timer-label").textContent = label;
+  const labelEl = document.getElementById("review-timer-label");
+  const displayEl = document.getElementById("review-timer-display");
+  const progressEl = document.getElementById("review-progress");
+
+  if (!labelEl || !displayEl || !progressEl) {
+    console.error("review timer elements not found");
+    return;
+  }
+
+  labelEl.textContent = label;
 
   updateReviewCountdownDisplay(seconds, 1);
 
@@ -317,6 +358,8 @@ function stopReviewCountdown() {
 function updateReviewCountdownDisplay(seconds, progressRatio) {
   const display = document.getElementById("review-timer-display");
   const progress = document.getElementById("review-progress");
+
+  if (!display || !progress) return;
 
   display.textContent = String(seconds);
   progress.style.transform = `scaleX(${progressRatio})`;
@@ -400,48 +443,103 @@ function forceFinishCurrentDrawingPhase() {
 
 function showTimeupOverlay() {
   const overlay = document.getElementById("timeup-overlay");
-  overlay.classList.add("show");
+
+  if (overlay) {
+    overlay.classList.add("show");
+  }
 }
 
 function hideTimeupOverlay() {
   const overlay = document.getElementById("timeup-overlay");
-  overlay.classList.remove("show");
+
+  if (overlay) {
+    overlay.classList.remove("show");
+  }
 }
 
 // -------------------------
 // ペン設定
+// イベント委任方式：確実に反応させる
 // -------------------------
 
-document.querySelectorAll(".color-btn").forEach((button) => {
-  button.addEventListener("click", (event) => {
+document.addEventListener("pointerdown", (event) => {
+  const colorButton = event.target.closest(".color-btn");
+  const sizeButton = event.target.closest(".size-btn");
+
+  if (colorButton) {
+    event.preventDefault();
+
     if (phaseEnding) return;
 
-    flashButton(event.currentTarget);
-
-    selectedColor = event.currentTarget.dataset.color;
+    selectedColor = colorButton.dataset.color;
 
     document.querySelectorAll(".color-btn").forEach((btn) => {
       btn.classList.remove("selected");
     });
 
-    event.currentTarget.classList.add("selected");
-  });
-});
+    colorButton.classList.add("selected");
+    flashButton(colorButton);
 
-document.querySelectorAll(".size-btn").forEach((button) => {
-  button.addEventListener("click", (event) => {
+    console.log("selectedColor:", selectedColor);
+    return;
+  }
+
+  if (sizeButton) {
+    event.preventDefault();
+
     if (phaseEnding) return;
 
-    flashButton(event.currentTarget);
-
-    selectedWidth = Number(event.currentTarget.dataset.size);
+    selectedWidth = Number(sizeButton.dataset.size);
 
     document.querySelectorAll(".size-btn").forEach((btn) => {
       btn.classList.remove("selected");
     });
 
-    event.currentTarget.classList.add("selected");
-  });
+    sizeButton.classList.add("selected");
+    flashButton(sizeButton);
+
+    console.log("selectedWidth:", selectedWidth);
+    return;
+  }
+}, { passive: false });
+
+document.addEventListener("click", (event) => {
+  const colorButton = event.target.closest(".color-btn");
+  const sizeButton = event.target.closest(".size-btn");
+
+  if (colorButton) {
+    event.preventDefault();
+
+    if (phaseEnding) return;
+
+    selectedColor = colorButton.dataset.color;
+
+    document.querySelectorAll(".color-btn").forEach((btn) => {
+      btn.classList.remove("selected");
+    });
+
+    colorButton.classList.add("selected");
+
+    console.log("selectedColor click:", selectedColor);
+    return;
+  }
+
+  if (sizeButton) {
+    event.preventDefault();
+
+    if (phaseEnding) return;
+
+    selectedWidth = Number(sizeButton.dataset.size);
+
+    document.querySelectorAll(".size-btn").forEach((btn) => {
+      btn.classList.remove("selected");
+    });
+
+    sizeButton.classList.add("selected");
+
+    console.log("selectedWidth click:", selectedWidth);
+    return;
+  }
 });
 
 // -------------------------
@@ -636,9 +734,12 @@ function showMidReview() {
 
   showScreen("review-screen");
 
-  startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
-    startSecondDrawingPhase();
-  });
+  // 画面表示後に確実に自動開始
+  setTimeout(() => {
+    startReviewCountdown(MID_DISCUSSION_SECONDS, "途中討論", () => {
+      startSecondDrawingPhase();
+    });
+  }, 50);
 }
 
 function showFinalReview() {
@@ -663,9 +764,12 @@ function showFinalReview() {
 
   showScreen("review-screen");
 
-  startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
-    showVoteScreen();
-  });
+  // 画面表示後に確実に自動開始
+  setTimeout(() => {
+    startReviewCountdown(FINAL_DISCUSSION_SECONDS, "最終討論", () => {
+      showVoteScreen();
+    });
+  }, 50);
 }
 
 // -------------------------
@@ -674,6 +778,7 @@ function showFinalReview() {
 
 function showVoteScreen() {
   stopReviewCountdown();
+
   showScreen("vote-screen");
 
   const voteList = document.getElementById("vote-list");
@@ -728,6 +833,7 @@ document.getElementById("back-top-btn").addEventListener("click", (event) => {
   finalImageDataUrl = null;
 
   phaseEnding = false;
+
   stopDrawingCountdown();
   stopReviewCountdown();
 
