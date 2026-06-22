@@ -394,6 +394,99 @@ async function startGame(roomId, topic) {
 async function startOnlineGame(roomId, topic) {
   return startGame(roomId, topic);
 }
+// ==============================
+// 絵の保存
+// ==============================
+
+async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
+  const fixedRoomId = normalizeRoomId(roomId);
+
+  if (!fixedRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  if (!phase) {
+    throw new Error("phase が空です");
+  }
+
+  if (!imageDataUrl) {
+    throw new Error("画像データが空です");
+  }
+
+  await signIn();
+
+  const uid = getCurrentUid();
+
+  if (!uid) {
+    throw new Error("ログインUIDが取得できません");
+  }
+
+  const drawingRef = db
+    .collection("rooms")
+    .doc(fixedRoomId)
+    .collection("drawings")
+    .doc(phase + "_" + uid);
+
+  await drawingRef.set(
+    {
+      uid: uid,
+      name: playerName || "名無し",
+      phase: phase,
+      image: imageDataUrl,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("絵を保存しました:", fixedRoomId, phase, uid);
+}
+
+// ==============================
+// 絵の監視
+// ==============================
+
+function listenDrawings(roomId, phase, callback) {
+  const fixedRoomId = normalizeRoomId(roomId);
+
+  if (!fixedRoomId) {
+    console.warn("listenDrawings: 部屋IDが空");
+    return null;
+  }
+
+  if (unsubscribeDrawings) {
+    unsubscribeDrawings();
+    unsubscribeDrawings = null;
+  }
+
+  console.log("絵の監視開始:", fixedRoomId, phase);
+
+  unsubscribeDrawings = db
+    .collection("rooms")
+    .doc(fixedRoomId)
+    .collection("drawings")
+    .where("phase", "==", phase)
+    .onSnapshot(
+      (snapshot) => {
+        const drawings = [];
+
+        snapshot.forEach((doc) => {
+          drawings.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+
+        console.log("絵一覧更新:", drawings);
+
+        callback(drawings);
+      },
+      (error) => {
+        console.error("絵の監視エラー:", error);
+      }
+    );
+
+  return unsubscribeDrawings;
+}
 
 // ==============================
 // リスナー停止
@@ -410,8 +503,14 @@ function stopListeners() {
     unsubscribePlayers = null;
   }
 
+  if (unsubscribeDrawings) {
+    unsubscribeDrawings();
+    unsubscribeDrawings = null;
+  }
+
   console.log("Firebase リスナー停止");
 }
+
 
 // ==============================
 // app.js へ公開
@@ -428,7 +527,10 @@ window.GameDB = {
   startGame,
   startOnlineGame,
   stopListeners,
-  getCurrentUid
+  getCurrentUid,
+  saveDrawing,
+  listenDrawings,
+
 };
 
 console.log("GameDB ready:", window.GameDB);
