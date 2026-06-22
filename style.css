@@ -1748,3 +1748,62 @@ input:focus {
   background: #ffffff !important;
   display: block;
 }
+/* v615 一旦タイトルまわりを非表示 */
+.app-header,
+.game-header,
+.header,
+.title-area,
+.logo-area,
+.app-logo,
+.logo,
+.main-title,
+.app-title {
+  display: none !important;
+}
+/* v615 ロビー状態表示 */
+.player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.player-name {
+  font-weight: 900;
+}
+
+.player-status {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 2px solid #2b2118;
+}
+
+.player-status.host {
+  background: #ffd25c;
+  color: #2b2118;
+}
+
+.player-status.ready {
+  background: #8ee48e;
+  color: #183b18;
+}
+
+.player-status.waiting {
+  background: #f3e3c2;
+  color: #80613d;
+}
+
+#start-game-btn:disabled {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+  cursor: not-allowed;
+}
+
+.ready-done {
+  background: linear-gradient(180deg, #9cf59c, #62cc62) !important;
+}
+
