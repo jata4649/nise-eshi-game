@@ -1,123 +1,202 @@
-console.log("firebase.js version 605 loaded");
+console.log("firebase.js version 607 loaded");
 
-// -------------------------
-// Firebase 初期化
-// -------------------------
-
+// ==============================
+// Firebase 設定
+// ==============================
+// ↓ ここは Firebase Console の設定を入れてください
 const firebaseConfig = {
-  apiKey:"AIzaSyDcYlfCcJVFwctETjLdHcEaCgXPdSZ-4Uc",
-  authDomain: "nise-eshi-game.firebaseapp.com",
-  projectId:"nise-eshi-game",
-  storageBucket: "nise-eshi-game.firebasestorage.app",
-  messagingSenderId: "284787119511",
-  appId: "1:284787119511:web:a62be3e2f97f9c0e22a0d2"
+  apiKey: "ここにあなたのapiKey",
+  authDomain: "ここにあなたのauthDomain",
+  projectId: "ここにあなたのprojectId",
+  storageBucket: "ここにあなたのstorageBucket",
+  messagingSenderId: "ここにあなたのmessagingSenderId",
+  appId: "ここにあなたのappId"
 };
 
-firebase.initializeApp(firebaseConfig);
+// ==============================
+// Firebase 初期化
+// ==============================
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-let currentUid = null;
-let unsubscribePlayers = null;
 let unsubscribeRoom = null;
+let unsubscribePlayers = null;
 
-// -------------------------
-// 匿名ログイン
-// -------------------------
+// ==============================
+// 共通
+// ==============================
+function normalizeRoomId(roomId) {
+  return String(roomId || "").trim().toUpperCase();
+}
 
-async function signInGameUser() {
+function getCurrentUid() {
+  return auth.currentUser ? auth.currentUser.uid : null;
+}
+
+async function signIn() {
   if (auth.currentUser) {
-    currentUid = auth.currentUser.uid;
-    return currentUid;
+    console.log("すでにログイン済み:", auth.currentUser.uid);
+    return auth.currentUser;
   }
 
   const result = await auth.signInAnonymously();
-  currentUid = result.user.uid;
-
-  console.log("signed in:", currentUid);
-
-  return currentUid;
+  console.log("匿名ログイン成功:", result.user.uid);
+  return result.user;
 }
 
-// -------------------------
+// ==============================
 // 部屋作成
-// -------------------------
+// ==============================
+async function createRoom(roomId) {
+  const fixedRoomId = normalizeRoomId(roomId);
 
-async function createGameRoom(roomId) {
-  const uid = await signInGameUser();
+  if (!fixedRoomId) {
+    throw new Error("部屋IDが空です");
+  }
 
-  const roomRef = db.collection("rooms").doc(roomId);
+  await signIn();
 
-  await roomRef.set({
-    roomId: roomId,
-    hostUid: uid,
-    status: "lobby",
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    topic: null
-  });
+  const roomRef = db.collection("rooms").doc(fixedRoomId);
 
-  return roomId;
+  await roomRef.set(
+    {
+      roomId: fixedRoomId,
+      status: "lobby",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      hostUid: getCurrentUid(),
+      topic: null
+    },
+    { merge: true }
+  );
+
+  console.log("部屋作成完了:", fixedRoomId);
+  return fixedRoomId;
 }
 
-// -------------------------
-// 部屋が存在するか確認
-// -------------------------
+// ==============================
+// 部屋存在確認
+// ==============================
+// GitHub Pages / スマホ通信で少し遅れることがあるのでリトライ付き
+async function roomExists(roomId) {
+  const fixedRoomId = normalizeRoomId(roomId);
 
-async function checkRoomExists(roomId) {
-  const roomDoc = await db.collection("rooms").doc(roomId).get();
-  return roomDoc.exists;
+  if (!fixedRoomId) {
+    return false;
+  }
+
+  await signIn();
+
+  const roomRef = db.collection("rooms").doc(fixedRoomId);
+
+  for (let i = 0; i < 10; i++) {
+    const snap = await roomRef.get();
+
+    if (snap.exists) {
+      console.log("部屋発見:", fixedRoomId);
+      return true;
+    }
+
+    console.log(`部屋確認中 ${i + 1}/10:`, fixedRoomId);
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  console.warn("部屋が見つかりません:", fixedRoomId);
+  return false;
 }
 
-// -------------------------
-// 部屋参加・プレイヤー登録
-// -------------------------
+// ==============================
+// 入室
+// ==============================
+async function joinRoom(roomId, playerName) {
+  const fixedRoomId = normalizeRoomId(roomId);
+  const fixedName = String(playerName || "").trim();
 
-async function joinGameRoom(roomId, playerName) {
-  const uid = await signInGameUser();
+  if (!fixedRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  if (!fixedName) {
+    throw new Error("名前が空です");
+  }
+
+  await signIn();
+
+  const exists = await roomExists(fixedRoomId);
+
+  if (!exists) {
+    throw new Error("部屋が存在しません: " + fixedRoomId);
+  }
+
+  const uid = getCurrentUid();
 
   const playerRef = db
     .collection("rooms")
-    .doc(roomId)
+    .doc(fixedRoomId)
     .collection("players")
     .doc(uid);
 
-  await playerRef.set({
-    uid: uid,
-    name: playerName,
-    ready: false,
-    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  await playerRef.set(
+    {
+      uid: uid,
+      name: fixedName,
+      ready: false,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
 
-  return uid;
+  await db.collection("rooms").doc(fixedRoomId).set(
+    {
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("入室完了:", fixedRoomId, fixedName);
 }
 
-// -------------------------
+// ==============================
 // 準備OK
-// -------------------------
+// ==============================
+async function setReady(roomId, ready) {
+  const fixedRoomId = normalizeRoomId(roomId);
 
-async function setPlayerReady(roomId, ready) {
-  const uid = await signInGameUser();
+  await signIn();
 
-  const playerRef = db
+  const uid = getCurrentUid();
+
+  if (!uid) {
+    throw new Error("ログインしていません");
+  }
+
+  await db
     .collection("rooms")
-    .doc(roomId)
+    .doc(fixedRoomId)
     .collection("players")
-    .doc(uid);
+    .doc(uid)
+    .set(
+      {
+        ready: !!ready,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
 
-  await playerRef.set({
-    ready: ready,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  console.log("準備状態更新:", ready);
 }
 
-// -------------------------
-// 参加者一覧をリアルタイム監視
-// -------------------------
+// ==============================
+// プレイヤー監視
+// ==============================
+function listenPlayers(roomId, callback) {
+  const fixedRoomId = normalizeRoomId(roomId);
 
-function listenGamePlayers(roomId, callback) {
   if (unsubscribePlayers) {
     unsubscribePlayers();
     unsubscribePlayers = null;
@@ -125,25 +204,37 @@ function listenGamePlayers(roomId, callback) {
 
   unsubscribePlayers = db
     .collection("rooms")
-    .doc(roomId)
+    .doc(fixedRoomId)
     .collection("players")
     .orderBy("joinedAt", "asc")
-    .onSnapshot((snapshot) => {
-      const players = [];
+    .onSnapshot(
+      snapshot => {
+        const players = [];
 
-      snapshot.forEach((doc) => {
-        players.push(doc.data());
-      });
+        snapshot.forEach(doc => {
+          players.push({
+            uid: doc.id,
+            ...doc.data()
+          });
+        });
 
-      callback(players);
-    });
+        console.log("参加者更新:", players);
+        callback(players);
+      },
+      error => {
+        console.error("参加者監視エラー:", error);
+      }
+    );
+
+  return unsubscribePlayers;
 }
 
-// -------------------------
-// 部屋状態をリアルタイム監視
-// -------------------------
+// ==============================
+// 部屋監視
+// ==============================
+function listenRoom(roomId, callback) {
+  const fixedRoomId = normalizeRoomId(roomId);
 
-function listenGameRoom(roomId, callback) {
   if (unsubscribeRoom) {
     unsubscribeRoom();
     unsubscribeRoom = null;
@@ -151,61 +242,89 @@ function listenGameRoom(roomId, callback) {
 
   unsubscribeRoom = db
     .collection("rooms")
-    .doc(roomId)
-    .onSnapshot((doc) => {
-      if (!doc.exists) return;
-      callback(doc.data());
-    });
+    .doc(fixedRoomId)
+    .onSnapshot(
+      doc => {
+        if (!doc.exists) {
+          console.warn("部屋が存在しません:", fixedRoomId);
+          callback(null);
+          return;
+        }
+
+        const room = {
+          id: doc.id,
+          ...doc.data()
+        };
+
+        console.log("部屋更新:", room);
+        callback(room);
+      },
+      error => {
+        console.error("部屋監視エラー:", error);
+      }
+    );
+
+  return unsubscribeRoom;
 }
 
-// -------------------------
+// ==============================
 // ゲーム開始
-// -------------------------
+// ==============================
+async function startGame(roomId, topic) {
+  const fixedRoomId = normalizeRoomId(roomId);
 
-async function startOnlineGame(roomId, topic) {
-  await signInGameUser();
+  await signIn();
 
-  const roomRef = db.collection("rooms").doc(roomId);
+  await db.collection("rooms").doc(fixedRoomId).set(
+    {
+      status: "topic",
+      topic: topic,
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
 
-  await roomRef.set({
-    status: "topic",
-    topic: topic,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  console.log("ゲーム開始:", fixedRoomId, topic);
 }
 
-// -------------------------
-// 接続解除
-// -------------------------
+// 既存 app.js が startOnlineGame という名前を使っていても動くようにする
+async function startOnlineGame(roomId, topic) {
+  return startGame(roomId, topic);
+}
 
-function stopGameListeners() {
+// ==============================
+// リスナー停止
+// ==============================
+function stopListeners() {
+  if (unsubscribeRoom) {
+    unsubscribeRoom();
+    unsubscribeRoom = null;
+  }
+
   if (unsubscribePlayers) {
     unsubscribePlayers();
     unsubscribePlayers = null;
   }
 
-  if (unsubscribeRoom) {
-    unsubscribeRoom();
-    unsubscribeRoom = null;
-  }
+  console.log("Firebase リスナー停止");
 }
 
-// -------------------------
-// app.js から使えるようにする
-// -------------------------
-
+// ==============================
+// app.js へ公開
+// ==============================
 window.GameDB = {
-  signIn: signInGameUser,
-  createRoom: createGameRoom,
-  roomExists: checkRoomExists,
-  joinRoom: joinGameRoom,
-  setReady: setPlayerReady,
-  listenPlayers: listenGamePlayers,
-  listenRoom: listenGameRoom,
-  startGame: startOnlineGame,
-  stopListeners: stopGameListeners,
-  getCurrentUid: function () {
-    return currentUid;
-  }
+  signIn,
+  createRoom,
+  roomExists,
+  joinRoom,
+  setReady,
+  listenPlayers,
+  listenRoom,
+  startGame,
+  startOnlineGame,
+  stopListeners,
+  getCurrentUid
 };
 
+console.log("GameDB ready:", window.GameDB);
