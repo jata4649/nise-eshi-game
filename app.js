@@ -407,8 +407,43 @@ function startOnlineListeners() {
   window.GameDB.listenPlayers(currentRoomId, (players) => {
   currentPlayers = players || [];
 
-  renderLobbyPlayers(currentPlayers);
+  function renderLobbyPlayers(players) {
+  const playerList = document.getElementById("player-list");
+  if (!playerList) return;
+
+  playerList.innerHTML = "";
+
+  const hostUid = currentRoomData && currentRoomData.hostUid;
+
+  players.forEach((player) => {
+    const item = document.createElement("li");
+    item.className = "player-item";
+
+    const isHost = player.uid === hostUid;
+
+    let statusText = "";
+
+    if (isHost) {
+      statusText = "ホスト";
+    } else if (player.ready) {
+      statusText = "準備OK";
+    } else {
+      statusText = "準備待ち";
+    }
+
+    item.innerHTML = `
+      <span class="player-name">${escapeHtml(player.name || "名無し")}</span>
+      <span class="player-status ${isHost ? "host" : player.ready ? "ready" : "waiting"}">
+        ${statusText}
+      </span>
+    `;
+
+    playerList.appendChild(item);
+  });
+
   updateLobbyControlButtons();
+}
+
 });
 
 
