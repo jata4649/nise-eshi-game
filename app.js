@@ -1,4 +1,4 @@
-console.log("app.js version 608 loaded");
+console.log("app.js version 610 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 608 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v608";
+  badge.textContent = "v610";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -64,6 +64,46 @@ let currentStroke = null;
 
 let selectedColor = "#000000";
 let selectedWidth = 10;
+
+// -------------------------
+// デバッグ・通信補助
+// -------------------------
+
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(message));
+      }, ms);
+    })
+  ]);
+}
+
+function getErrorText(error) {
+  if (!error) return "不明なエラー";
+
+  return (
+    "エラーコード:\n" +
+    (error.code || "コードなし") +
+    "\n\n" +
+    "エラー内容:\n" +
+    (error.message || String(error))
+  );
+}
+
+function requireGameDB() {
+  if (!window.GameDB) {
+    alert(
+      "通信の準備がまだできていません。\n\n" +
+      "firebase.js が読み込まれていない可能性があります。\n" +
+      "index.html の script 順番を確認してください。"
+    );
+    return false;
+  }
+
+  return true;
+}
 
 // -------------------------
 // キャンバス初期化
@@ -145,6 +185,14 @@ function createRoomId() {
 }
 
 function pickRandomTopic() {
+  if (!window.TOPICS && typeof TOPICS === "undefined") {
+    console.warn("TOPICS が見つかりません。仮のお題を使います。");
+    return {
+      majority: "猫",
+      minority: "虎"
+    };
+  }
+
   return TOPICS[Math.floor(Math.random() * TOPICS.length)];
 }
 
@@ -257,10 +305,7 @@ function updateDrawingTopicBadge() {
 document.getElementById("create-room-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
 
-  if (!window.GameDB) {
-    alert("通信の準備がまだできていません。少し待ってからもう一度お試しください。");
-    return;
-  }
+  if (!requireGameDB()) return;
 
   const button = event.currentTarget;
 
@@ -273,24 +318,27 @@ document.getElementById("create-room-btn").addEventListener("click", async (even
 
     console.log("部屋作成開始:", currentRoomId);
 
-    // 匿名ログインは待つ
-    await window.GameDB.signIn();
+    await withTimeout(
+      window.GameDB.signIn(),
+      12000,
+      "匿名ログインに時間がかかっています"
+    );
+
     console.log("匿名ログイン成功:", window.GameDB.getCurrentUid());
 
-    // 部屋作成は裏で進める
-    // Firestoreに書き込みができているのに画面が止まる問題を避けるため await しない
-    window.GameDB.createRoom(currentRoomId)
-      .then(() => {
-        console.log("部屋作成成功:", currentRoomId);
-      })
-      .catch((error) => {
-        console.error("部屋作成は後から失敗しました:", error);
-      });
+    await withTimeout(
+      window.GameDB.createRoom(currentRoomId),
+      12000,
+      "Firestoreへの部屋作成に時間がかかっています"
+    );
+
+    console.log("部屋作成成功:", currentRoomId);
 
     button.textContent = "部屋を作る";
     button.disabled = false;
 
     showScreen("name-screen");
+
   } catch (error) {
     console.error("部屋作成エラー:", error);
 
@@ -298,8 +346,14 @@ document.getElementById("create-room-btn").addEventListener("click", async (even
     button.disabled = false;
 
     alert(
-      "通信に失敗しました。\n\n" +
-      "匿名ログインや通信状態を確認して、もう一度お試しください。"
+      "部屋作成に失敗しました。\n\n" +
+      getErrorText(error) +
+      "\n\n" +
+      "確認すること:\n" +
+      "1. firebase.js が v610 で読み込まれているか\n" +
+      "2. Anonymous が有効か\n" +
+      "3. Firestore Rules を Publish 済みか\n" +
+      "4. projectId が nise-eshi-game か"
     );
   }
 });
@@ -307,10 +361,7 @@ document.getElementById("create-room-btn").addEventListener("click", async (even
 document.getElementById("join-room-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
 
-  if (!window.GameDB) {
-    alert("通信の準備がまだできていません。少し待ってからもう一度お試しください。");
-    return;
-  }
+  if (!requireGameDB()) return;
 
   const inputRoomId = document.getElementById("room-id-input").value.trim().toUpperCase();
 
@@ -319,46 +370,47 @@ document.getElementById("join-room-btn").addEventListener("click", async (event)
     return;
   }
 
+  const button = event.currentTarget;
+
   try {
-    event.currentTarget.textContent = "部屋を探しています…";
-    event.currentTarget.disabled = true;
+    button.textContent = "部屋を確認中…";
+    button.disabled = true;
 
-    await window.GameDB.signIn();
+    await withTimeout(
+      window.GameDB.signIn(),
+      12000,
+      "匿名ログインに時間がかかっています"
+    );
 
-    const exists = await window.GameDB.roomExists(inputRoomId);
+    console.log("参加予定の部屋コード:", inputRoomId);
 
-    if (!exists) {
-      event.currentTarget.textContent = "部屋に参加する";
-      event.currentTarget.disabled = false;
-
-      alert("その部屋が見つかりませんでした。部屋コードを確認してください。");
-      return;
-    }
-
+    // v610ではここで厳密な部屋存在チェックをしない
+    // 名前入力後の joinRoom で最終確認する
     currentRoomId = inputRoomId;
     onlineTopicHandled = false;
 
-    event.currentTarget.textContent = "部屋に参加する";
-    event.currentTarget.disabled = false;
+    button.textContent = "部屋に参加する";
+    button.disabled = false;
 
     showScreen("name-screen");
+
   } catch (error) {
-    console.error(error);
+    console.error("部屋参加準備エラー:", error);
 
-    event.currentTarget.textContent = "部屋に参加する";
-    event.currentTarget.disabled = false;
+    button.textContent = "部屋に参加する";
+    button.disabled = false;
 
-    alert("通信に失敗しました。もう一度お試しください。");
+    alert(
+      "通信に失敗しました。\n\n" +
+      getErrorText(error)
+    );
   }
 });
 
 document.getElementById("enter-room-btn").addEventListener("click", async (event) => {
   flashButton(event.currentTarget);
 
-  if (!window.GameDB) {
-    alert("通信の準備がまだできていません。少し待ってからもう一度お試しください。");
-    return;
-  }
+  if (!requireGameDB()) return;
 
   const nameInput = document.getElementById("player-name-input").value.trim();
 
@@ -367,13 +419,34 @@ document.getElementById("enter-room-btn").addEventListener("click", async (event
     return;
   }
 
+  if (!currentRoomId) {
+    alert("部屋コードがありません。トップに戻ってやり直してください。");
+    return;
+  }
+
+  const button = event.currentTarget;
+
   try {
-    event.currentTarget.textContent = "参加中…";
-    event.currentTarget.disabled = true;
+    button.textContent = "参加中…";
+    button.disabled = true;
 
     playerName = nameInput;
 
-    await window.GameDB.joinRoom(currentRoomId, playerName);
+    console.log("入室開始:", currentRoomId, playerName);
+
+    await withTimeout(
+      window.GameDB.signIn(),
+      12000,
+      "匿名ログインに時間がかかっています"
+    );
+
+    await withTimeout(
+      window.GameDB.joinRoom(currentRoomId, playerName),
+      12000,
+      "Firestoreへの参加登録に時間がかかっています"
+    );
+
+    console.log("入室成功:", currentRoomId, playerName);
 
     document.getElementById("room-id-display").textContent = currentRoomId;
 
@@ -383,15 +456,20 @@ document.getElementById("enter-room-btn").addEventListener("click", async (event
 
     startOnlineListeners();
 
-    event.currentTarget.textContent = "参加する";
-    event.currentTarget.disabled = false;
+    button.textContent = "参加する";
+    button.disabled = false;
+
   } catch (error) {
-    console.error(error);
+    console.error("入室エラー:", error);
 
-    event.currentTarget.textContent = "参加する";
-    event.currentTarget.disabled = false;
+    button.textContent = "参加する";
+    button.disabled = false;
 
-    alert("参加に失敗しました。もう一度お試しください。");
+    alert(
+      "参加に失敗しました。\n\n" +
+      "部屋コードが正しいか確認してください。\n\n" +
+      getErrorText(error)
+    );
   }
 });
 
@@ -410,12 +488,20 @@ document.getElementById("ready-btn").addEventListener("click", async (event) => 
   try {
     event.currentTarget.textContent = "準備OK済み";
 
-    await window.GameDB.setReady(currentRoomId, true);
+    await withTimeout(
+      window.GameDB.setReady(currentRoomId, true),
+      12000,
+      "準備状態の共有に時間がかかっています"
+    );
 
     showOnlineMessage("みんなと通信中〜 準備状態を共有しました。");
   } catch (error) {
-    console.error(error);
-    alert("準備状態の共有に失敗しました。もう一度お試しください。");
+    console.error("準備状態エラー:", error);
+
+    alert(
+      "準備状態の共有に失敗しました。\n\n" +
+      getErrorText(error)
+    );
   }
 });
 
@@ -427,9 +513,11 @@ document.getElementById("start-game-btn").addEventListener("click", async (event
     return;
   }
 
+  const button = event.currentTarget;
+
   try {
-    event.currentTarget.textContent = "みんなに開始を知らせています…";
-    event.currentTarget.disabled = true;
+    button.textContent = "みんなに開始を知らせています…";
+    button.disabled = true;
 
     resetRound();
 
@@ -437,21 +525,28 @@ document.getElementById("start-game-btn").addEventListener("click", async (event
 
     onlineTopicHandled = true;
 
-    await window.GameDB.startGame(currentRoomId, currentTopic);
+    await withTimeout(
+      window.GameDB.startGame(currentRoomId, currentTopic),
+      12000,
+      "ゲーム開始の共有に時間がかかっています"
+    );
 
     document.getElementById("topic-display").textContent = currentTopic.majority;
 
-    event.currentTarget.textContent = "ゲーム開始";
-    event.currentTarget.disabled = false;
+    button.textContent = "ゲーム開始";
+    button.disabled = false;
 
     showScreen("topic-screen");
   } catch (error) {
-    console.error(error);
+    console.error("ゲーム開始エラー:", error);
 
-    event.currentTarget.textContent = "ゲーム開始";
-    event.currentTarget.disabled = false;
+    button.textContent = "ゲーム開始";
+    button.disabled = false;
 
-    alert("ゲーム開始の共有に失敗しました。もう一度お試しください。");
+    alert(
+      "ゲーム開始の共有に失敗しました。\n\n" +
+      getErrorText(error)
+    );
   }
 });
 
@@ -707,7 +802,6 @@ function hideTimeupOverlay() {
 
 // -------------------------
 // ペン設定
-// イベント委任方式：確実に反応させる
 // -------------------------
 
 document.addEventListener("pointerdown", (event) => {
@@ -1052,7 +1146,7 @@ function showVoteScreen() {
 }
 
 // -------------------------
-// 結果 豪華版
+// 結果
 // -------------------------
 
 function showResultScreen() {
