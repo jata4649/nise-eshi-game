@@ -1,4 +1,4 @@
-console.log("app.js version 601 loaded");
+console.log("app.js version 602 loaded");
 
 // -------------------------
 // バージョン確認表示
@@ -6,7 +6,7 @@ console.log("app.js version 601 loaded");
 
 function showVersionBadge() {
   const badge = document.createElement("div");
-  badge.textContent = "v601";
+  badge.textContent = "v602";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -46,7 +46,7 @@ let reviewDurationMs = 0;
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
 
-const FIRST_DRAW_SECONDS = 20;
+const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
 const MID_DISCUSSION_SECONDS = 60;
 const FINAL_DISCUSSION_SECONDS = 60;
@@ -400,9 +400,9 @@ function startFirstDrawingPhase() {
   updateDrawingTopicBadge();
 
   document.getElementById("drawing-phase-label").textContent = "前半お絵描き";
-  document.getElementById("drawing-title").textContent = "まずは20秒で描こう";
+  document.getElementById("drawing-title").textContent = "まずは15秒で描こう";
   document.getElementById("drawing-help").textContent =
-    "途中で一度見せ合います。ゲージがなくなったら強制的に公開されます。";
+    "15秒で一度見せ合います。ゲージがなくなったら強制的に公開されます。";
 
   document.getElementById("finish-drawing-btn").style.display = "none";
 
