@@ -2319,3 +2319,60 @@ input:focus {
   font-size: 14px;
   color: #5f5145;
 }
+
+/* ==============================
+   v622 投票画面 完成絵ギャラリー
+============================== */
+.vote-gallery-box {
+  margin-top: 22px;
+  padding: 14px;
+  border: 2px solid #2b2118;
+  border-radius: 18px;
+  background: #fff8dc;
+}
+
+.vote-gallery-title {
+  font-size: 18px;
+  font-weight: 900;
+  text-align: center;
+  margin-bottom: 12px;
+  color: #2b2118;
+}
+
+.vote-gallery-empty {
+  text-align: center;
+  padding: 12px;
+  color: #6b4b23;
+  font-weight: 700;
+}
+
+.vote-gallery-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.vote-gallery-card {
+  border: 2px solid #2b2118;
+  border-radius: 14px;
+  background: #fffaf0;
+  overflow: hidden;
+  box-shadow: 0 3px 0 rgba(43, 33, 24, 0.22);
+}
+
+.vote-gallery-name {
+  padding: 8px;
+  font-weight: 900;
+  text-align: center;
+  background: #ffcf5c;
+  border-bottom: 2px solid #2b2118;
+  color: #2b2118;
+}
+
+.vote-gallery-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: #ffffff;
+}
