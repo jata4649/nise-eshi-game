@@ -1,7 +1,7 @@
-console.log("app.js version 615 loaded");
+console.log("app.js version 616 loaded");
 
 // ==============================
-// v615 バージョン表示
+// v616 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v615";
+  badge.textContent = "v616";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -67,14 +67,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "615");
+      url.searchParams.set("v", "616");
       url.searchParams.set("reload", Date.now().toString());
 
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "615");
+      url.searchParams.set("v", "616");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -116,6 +116,11 @@ let midImageDataUrl = null;
 let finalImageDataUrl = null;
 
 let reviewGalleryUnsubscribe = null;
+let voteUnsubscribe = null;
+
+let hasVoted = false;
+let resultShown = false;
+let latestVotes = [];
 
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
@@ -172,7 +177,7 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v615 で読み込まれているか\n" +
+      "1. firebase.js が v616 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK が読み込まれているか"
     );
@@ -380,6 +385,10 @@ function startOnlineListeners() {
 
     renderLobbyPlayers(currentPlayers);
     updateLobbyControlButtons();
+
+    if (!resultShown && latestVotes.length > 0) {
+      checkAllVotesAndShowResult(latestVotes);
+    }
   });
 
   GameDB.listenRoom(currentRoomId, (room) => {
@@ -501,6 +510,9 @@ async function enterRoomFlow() {
     if (display) display.textContent = currentRoomId;
 
     onlineTopicHandled = false;
+    hasVoted = false;
+    resultShown = false;
+    latestVotes = [];
 
     showScreen("lobby-screen");
     startOnlineListeners();
@@ -1070,53 +1082,326 @@ function startReviewTimer(seconds, onFinish) {
 
 
 // ==============================
-// 投票・結果
+// v616 投票・結果同期
 // ==============================
+function getValidVotingPlayers() {
+  if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
+    return currentPlayers.filter((player) => player && player.uid);
+  }
+
+  return [];
+}
+
+function getMyVote(votes) {
+  const myUid = getMyUidSafe();
+  if (!myUid) return null;
+
+  return (votes || []).find((vote) => vote.uid === myUid) || null;
+}
+
+function renderVoteWaiting(votes) {
+  const voteList = $("vote-list");
+  if (!voteList) return;
+
+  const players = getValidVotingPlayers();
+  const voteCount = Array.isArray(votes) ? votes.length : 0;
+  const playerCount = players.length;
+
+  let status = document.getElementById("vote-status-box");
+
+  if (!status) {
+    status = document.createElement("div");
+    status.id = "vote-status-box";
+    status.className = "vote-status-box";
+    voteList.insertAdjacentElement("beforebegin", status);
+  }
+
+  const myVote = getMyVote(votes);
+
+  if (myVote) {
+    hasVoted = true;
+    status.innerHTML = `
+      <strong>投票済み</strong>
+      <p>${escapeHtml(myVote.votedName || "名無し")} に投票しました。</p>
+      <p>全員の投票を待っています。 ${voteCount} / ${playerCount}</p>
+    `;
+  } else {
+    status.innerHTML = `
+      <strong>投票してください</strong>
+      <p>全員の投票が終わると、自動で結果画面に進みます。</p>
+      <p>現在の投票数：${voteCount} / ${playerCount}</p>
+    `;
+  }
+
+  updateVoteButtonsDisabled();
+}
+
+function updateVoteButtonsDisabled() {
+  document.querySelectorAll(".vote-btn").forEach((button) => {
+    button.disabled = hasVoted || resultShown;
+    if (hasVoted) {
+      button.classList.add("vote-disabled");
+    } else {
+      button.classList.remove("vote-disabled");
+    }
+  });
+}
+
+function startVoteListener() {
+  if (voteUnsubscribe) {
+    try {
+      voteUnsubscribe();
+    } catch (error) {
+      console.warn("投票リスナー停止失敗:", error);
+    }
+    voteUnsubscribe = null;
+  }
+
+  if (!currentRoomId) return;
+  if (!window.GameDB || !window.GameDB.listenVotes) return;
+
+  try {
+    voteUnsubscribe = window.GameDB.listenVotes(currentRoomId, (votes) => {
+      latestVotes = votes || [];
+
+      const myVote = getMyVote(latestVotes);
+      hasVoted = !!myVote;
+
+      renderVoteWaiting(latestVotes);
+      checkAllVotesAndShowResult(latestVotes);
+    });
+  } catch (error) {
+    console.error("投票リスナー開始失敗:", error);
+  }
+}
+
+function checkAllVotesAndShowResult(votes) {
+  if (resultShown) return;
+
+  const players = getValidVotingPlayers();
+  const voteList = Array.isArray(votes) ? votes : [];
+
+  if (players.length <= 0) return;
+
+  const votedUidSet = new Set(voteList.map((vote) => vote.uid));
+  const allPlayerUids = players.map((player) => player.uid);
+
+  const allVoted = allPlayerUids.every((uid) => votedUidSet.has(uid));
+
+  if (allVoted && voteList.length >= players.length) {
+    showSyncedResultScreen(voteList);
+  }
+}
+
 function showVoteScreen() {
+  hasVoted = false;
+  resultShown = false;
+
   const voteList = $("vote-list");
   if (!voteList) return;
 
   voteList.innerHTML = "";
 
-  const players = currentPlayers.length > 0
-    ? currentPlayers
-    : [{ uid: "local", name: playerName || "あなた" }];
+  const oldStatus = $("vote-status-box");
+  if (oldStatus) oldStatus.remove();
+
+  const players = getValidVotingPlayers();
+
+  if (players.length <= 0) {
+    voteList.innerHTML = `
+      <p class="note">
+        投票できる参加者情報がまだ読み込まれていません。少し待ってください。
+      </p>
+    `;
+
+    showScreen("vote-screen");
+    startVoteListener();
+    return;
+  }
+
+  const myUid = getMyUidSafe();
 
   players.forEach((player) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "secondary-btn vote-btn";
-    button.textContent = player.name || "名無し";
 
-    button.addEventListener("click", () => {
-      showResultScreen(player);
+    const isMe = player.uid === myUid;
+
+    if (isMe) {
+      button.textContent = `${player.name || "名無し"}（自分）`;
+    } else {
+      button.textContent = player.name || "名無し";
+    }
+
+    button.addEventListener("click", async () => {
+      await handleVote(player);
     });
 
     voteList.appendChild(button);
   });
 
   showScreen("vote-screen");
+  startVoteListener();
+  renderVoteWaiting(latestVotes);
 }
 
-function showResultScreen(votedPlayer) {
+async function handleVote(votedPlayer) {
+  try {
+    if (!currentRoomId) {
+      alert("部屋情報がありません。");
+      return;
+    }
+
+    if (!votedPlayer || !votedPlayer.uid) {
+      alert("投票先が不正です。");
+      return;
+    }
+
+    if (hasVoted) {
+      alert("すでに投票済みです。");
+      return;
+    }
+
+    const GameDB = requireGameDB();
+
+    await GameDB.saveVote(currentRoomId, votedPlayer);
+
+    hasVoted = true;
+    updateVoteButtonsDisabled();
+
+    renderVoteWaiting(latestVotes);
+  } catch (error) {
+    console.error("投票失敗:", error);
+    alert(
+      "投票に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
+    );
+  }
+}
+
+function buildVoteResult(votes) {
+  const players = getValidVotingPlayers();
+
+  const resultMap = {};
+
+  players.forEach((player) => {
+    resultMap[player.uid] = {
+      uid: player.uid,
+      name: player.name || "名無し",
+      count: 0,
+      voters: []
+    };
+  });
+
+  votes.forEach((vote) => {
+    const votedUid = vote.votedUid;
+
+    if (!resultMap[votedUid]) {
+      resultMap[votedUid] = {
+        uid: votedUid,
+        name: vote.votedName || "名無し",
+        count: 0,
+        voters: []
+      };
+    }
+
+    resultMap[votedUid].count += 1;
+    resultMap[votedUid].voters.push(vote.name || "名無し");
+  });
+
+  const results = Object.values(resultMap);
+
+  results.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.name.localeCompare(b.name, "ja");
+  });
+
+  const maxCount = results.length > 0 ? results[0].count : 0;
+  const topPlayers = results.filter((result) => result.count === maxCount && maxCount > 0);
+
+  return {
+    results,
+    topPlayers,
+    maxCount
+  };
+}
+
+function showSyncedResultScreen(votes) {
+  if (resultShown) return;
+
+  resultShown = true;
+
+  if (voteUnsubscribe) {
+    try {
+      voteUnsubscribe();
+    } catch (error) {
+      console.warn("投票リスナー停止失敗:", error);
+    }
+    voteUnsubscribe = null;
+  }
+
   const resultDisplay = $("result-display");
 
-  if (resultDisplay) {
-    resultDisplay.innerHTML = `
-      <div class="result-message">
-        <p>あなたは</p>
-        <h3>${escapeHtml(votedPlayer.name || "名無し")}</h3>
-        <p>に投票しました。</p>
+  const voteResult = buildVoteResult(votes || []);
+  const results = voteResult.results;
+  const topPlayers = voteResult.topPlayers;
+
+  let topText = "";
+
+  if (topPlayers.length === 0) {
+    topText = "投票結果を集計できませんでした。";
+  } else if (topPlayers.length === 1) {
+    topText = `一番疑われた人：${escapeHtml(topPlayers[0].name)}`;
+  } else {
+    topText = `同票：${topPlayers.map((player) => escapeHtml(player.name)).join("、")}`;
+  }
+
+  let resultHtml = `
+    <div class="result-message">
+      <h3>${topText}</h3>
+      <p>全員の投票が完了しました。</p>
+    </div>
+
+    <div class="vote-result-list">
+  `;
+
+  results.forEach((result) => {
+    const votersText = result.voters.length > 0
+      ? result.voters.map((name) => escapeHtml(name)).join("、")
+      : "なし";
+
+    resultHtml += `
+      <div class="vote-result-item">
+        <div class="vote-result-main">
+          <strong>${escapeHtml(result.name)}</strong>
+          <span>${result.count}票</span>
+        </div>
+        <p>投票した人：${votersText}</p>
       </div>
-      <p class="note">
-        ※v615では投票結果の完全同期は次の段階で実装します。
-      </p>
     `;
+  });
+
+  resultHtml += `
+    </div>
+
+    <p class="note">
+      ※v616では投票同期まで対応しました。ニセ絵師の正解判定は次の段階で追加します。
+    </p>
+  `;
+
+  if (resultDisplay) {
+    resultDisplay.innerHTML = resultHtml;
   }
 
   showScreen("result-screen");
 }
 
+
+// ==============================
+// トップへ戻る
+// ==============================
 function backToTop() {
   cancelAnimationFrame(timerAnimationId);
   cancelAnimationFrame(reviewTimerAnimationId);
@@ -1128,6 +1413,15 @@ function backToTop() {
       console.warn(error);
     }
     reviewGalleryUnsubscribe = null;
+  }
+
+  if (voteUnsubscribe) {
+    try {
+      voteUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+    voteUnsubscribe = null;
   }
 
   if (window.GameDB && window.GameDB.stopListeners) {
@@ -1147,6 +1441,10 @@ function backToTop() {
 
   strokes = [];
   currentStroke = null;
+
+  hasVoted = false;
+  resultShown = false;
+  latestVotes = [];
 
   const roomInput = $("room-id-input");
   if (roomInput) roomInput.value = "";
@@ -1260,6 +1558,9 @@ function setupEvents() {
         }
 
         currentTopic = topic;
+        hasVoted = false;
+        resultShown = false;
+        latestVotes = [];
 
         await GameDB.startOnlineGame(currentRoomId, topic);
       } catch (error) {
@@ -1295,7 +1596,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v615 initialized");
+  console.log("app.js v616 initialized");
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
