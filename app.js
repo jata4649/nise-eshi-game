@@ -24,7 +24,7 @@ function showVersionBadge() {
   badge.style.pointerEvents = "none";
   document.body.appendChild(badge);
 }
-showVersionBadge();
+
 
 
 // ==============================
@@ -85,7 +85,7 @@ function showHardReloadButton() {
   // TOPページの一番下に置く
   topScreen.appendChild(box);
 }
-showHardReloadButton();
+
 
 
 // ==============================
@@ -2587,47 +2587,51 @@ function backToTop() {
   showScreen("top-screen");
 }
 
-
 // ==============================
-// イベント設定
+// イベント設定 v624 安定版
 // ==============================
 function setupEvents() {
-  const createBtn = $("create-room-btn");
-  if (createBtn) {
-    createBtn.addEventListener("click", createRoomFlow);
-  }
+  console.log("setupEvents v624 start");
 
-  const joinBtn = $("join-room-btn");
-  if (joinBtn) {
-    joinBtn.addEventListener("click", joinRoomFlow);
-  }
+  document.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!target) return;
 
-  const enterBtn = $("enter-room-btn");
-  if (enterBtn) {
-    enterBtn.addEventListener("click", enterRoomFlow);
-  }
+    const id = target.id;
 
-  const goDrawingBtn = $("go-drawing-btn");
-  if (goDrawingBtn) {
-    goDrawingBtn.addEventListener("click", () => {
+    if (id === "create-room-btn") {
+      console.log("create-room-btn clicked");
+      await createRoomFlow();
+      return;
+    }
+
+    if (id === "join-room-btn") {
+      console.log("join-room-btn clicked");
+      await joinRoomFlow();
+      return;
+    }
+
+    if (id === "enter-room-btn") {
+      console.log("enter-room-btn clicked");
+      await enterRoomFlow();
+      return;
+    }
+
+    if (id === "go-drawing-btn") {
       alert("全員同時に始まるので、自動で開始するまで待ってください。");
-    });
-  }
+      return;
+    }
 
-  const finishDrawingBtn = $("finish-drawing-btn");
-  if (finishDrawingBtn) {
-    finishDrawingBtn.addEventListener("click", async () => {
+    if (id === "finish-drawing-btn") {
       if (drawingPhase === 1) {
         await saveCurrentDrawingPhaseOnce("mid");
       } else {
         await saveCurrentDrawingPhaseOnce("final");
       }
-    });
-  }
+      return;
+    }
 
-  const readyBtn = $("ready-btn");
-  if (readyBtn) {
-    readyBtn.addEventListener("click", async () => {
+    if (id === "ready-btn") {
       try {
         if (!currentRoomId) {
           alert("部屋情報がありません。");
@@ -2657,12 +2661,10 @@ function setupEvents() {
           "message: " + (error.message || error)
         );
       }
-    });
-  }
+      return;
+    }
 
-  const startGameBtn = $("start-game-btn");
-  if (startGameBtn) {
-    startGameBtn.addEventListener("click", async () => {
+    if (id === "start-game-btn") {
       try {
         if (!currentRoomId) {
           alert("部屋情報がありません。");
@@ -2716,13 +2718,14 @@ function setupEvents() {
           "message: " + (error.message || error)
         );
       }
-    });
-  }
+      return;
+    }
 
-  const backTopBtn = $("back-top-btn");
-  if (backTopBtn) {
-    backTopBtn.addEventListener("click", backToTop);
-  }
+    if (id === "back-top-btn") {
+      backToTop();
+      return;
+    }
+  });
 
   window.addEventListener("beforeunload", () => {
     try {
@@ -2742,13 +2745,21 @@ function setupEvents() {
       startPresenceHeartbeat();
     }
   });
+
+  console.log("setupEvents v624 complete");
 }
 
 
+
 // ==============================
-// 初期化
+// 初期化 v624 安定版
 // ==============================
 function initApp() {
+  console.log("initApp v624 start");
+
+  showVersionBadge();
+  showHardReloadButton();
+
   initCanvas();
   setupCanvasEvents();
   setupDrawingTools();
@@ -2763,4 +2774,8 @@ function initApp() {
   console.log("app.js v624 initialized");
 }
 
-document.addEventListener("DOMContentLoaded", initApp);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
