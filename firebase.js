@@ -917,8 +917,7 @@ window.GameDB = {
   listenVotes,
   clearVotes,
   finishRoom,
-  resetRoomToLobby,
-
+  resetRoomToLobby
 };
 
 console.log("GameDB ready:", window.GameDB);
