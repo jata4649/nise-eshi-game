@@ -2095,3 +2095,227 @@ input:focus {
   color: #80613d;
 }
 
+
+/* ==============================
+   v620 同期タイマー
+============================== */
+.phase-sync-box {
+  margin: 16px auto 0;
+  padding: 14px;
+  max-width: 420px;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+  background: #fff8dc;
+  box-shadow: 0 4px 0 rgba(43, 33, 24, 0.25);
+  text-align: center;
+}
+
+.phase-sync-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b4b23;
+  margin-bottom: 4px;
+}
+
+.phase-sync-time {
+  font-size: 24px;
+  font-weight: 900;
+  color: #2b2118;
+  margin-bottom: 8px;
+}
+
+.phase-sync-bar {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #ead7aa;
+  border: 1px solid #2b2118;
+}
+
+.phase-sync-progress {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ffcf5c, #ff7a59);
+  transition: width 0.1s linear;
+}
+
+
+/* ==============================
+   v620 同票・再投票
+============================== */
+.runoff-box {
+  margin: 16px 0;
+  padding: 14px;
+  border: 2px dashed #d66b00;
+  border-radius: 16px;
+  background: #fff1d6;
+}
+
+.runoff-box strong {
+  color: #9a3f00;
+}
+
+.runoff-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.runoff-candidate {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 2px solid #2b2118;
+  background: #ffcf5c;
+  font-weight: 800;
+}
+
+
+/* ==============================
+   v620 結果画面 ニセ絵師強調
+============================== */
+.fake-artist-reveal {
+  margin: 12px auto;
+  padding: 12px;
+  border: 3px solid #2b2118;
+  border-radius: 18px;
+  background: #fff;
+  max-width: 360px;
+  text-align: center;
+}
+
+.fake-artist-label {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ff4d4d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.fake-artist-reveal strong {
+  font-size: 22px;
+  color: #2b2118;
+}
+
+.fake-result-highlight {
+  border: 3px solid #ff4d4d !important;
+  background: #fff0f0 !important;
+  box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.15);
+}
+
+.fake-badge-inline {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #ff4d4d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.answer-box {
+  margin: 16px 0;
+  padding: 16px;
+  border: 3px solid #2b2118;
+  border-radius: 18px;
+  background: #fffaf0;
+  text-align: center;
+}
+
+.answer-box h3 {
+  margin-top: 0;
+}
+
+.answer-box.citizen-win {
+  background: #eaffea;
+  border-color: #2f9e44;
+}
+
+.answer-box.fake-win {
+  background: #fff0f0;
+  border-color: #e03131;
+}
+
+
+/* ==============================
+   v620 もう一度遊ぶ
+============================== */
+.replay-box {
+  margin-top: 20px;
+  padding: 16px;
+  border: 2px solid #2b2118;
+  border-radius: 18px;
+  background: #fff8dc;
+  text-align: center;
+}
+
+#replay-btn {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.replay-box .note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #6b4b23;
+}
+
+
+/* ==============================
+   v620 投票ボタン補助
+============================== */
+.vote-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+
+.vote-status-box {
+  margin: 12px 0 16px;
+  padding: 14px;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+  background: #fff8dc;
+  text-align: center;
+}
+
+.vote-status-box strong {
+  display: block;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.vote-result-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.vote-result-item {
+  padding: 12px;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+  background: #fffaf0;
+}
+
+.vote-result-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.vote-result-item p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #5f5145;
+}
