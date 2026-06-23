@@ -1,7 +1,7 @@
-console.log("app.js version 617 loaded");
+console.log("app.js version 618 loaded");
 
 // ==============================
-// v617 バージョン表示
+// v618 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v617";
+  badge.textContent = "v618";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,13 +66,13 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "617");
+      url.searchParams.set("v", "618");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "617");
+      url.searchParams.set("v", "618");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -174,7 +174,7 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v617 で読み込まれているか\n" +
+      "1. firebase.js が v618 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK が読み込まれているか"
     );
@@ -1159,7 +1159,7 @@ function startReviewTimer(seconds, onFinish) {
 
 
 // ==============================
-// 投票・結果同期 v617
+// 投票・結果同期 v618
 // ==============================
 function getValidVotingPlayers() {
   if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
@@ -1701,7 +1701,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v617 initialized");
+  console.log("app.js v618 initialized");
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
