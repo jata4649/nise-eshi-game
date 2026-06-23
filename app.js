@@ -2779,3 +2779,38 @@ if (document.readyState === "loading") {
 } else {
   initApp();
 }
+// ==============================
+// v624 バージョンバッジ強制表示
+// ==============================
+(function forceVersionBadgeV624() {
+  function run() {
+    const oldBadge = document.getElementById("version-badge");
+    if (oldBadge) oldBadge.remove();
+
+    const badge = document.createElement("div");
+    badge.id = "version-badge";
+    badge.textContent = "v624";
+    badge.style.position = "fixed";
+    badge.style.right = "8px";
+    badge.style.bottom = "8px";
+    badge.style.zIndex = "999999";
+    badge.style.padding = "4px 8px";
+    badge.style.fontSize = "12px";
+    badge.style.fontWeight = "bold";
+    badge.style.color = "#2b2118";
+    badge.style.background = "#ffcf5c";
+    badge.style.border = "2px solid #2b2118";
+    badge.style.borderRadius = "999px";
+    badge.style.pointerEvents = "none";
+    document.body.appendChild(badge);
+
+    console.log("v624 badge forced");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+
