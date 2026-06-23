@@ -1,7 +1,7 @@
-console.log("app.js version 622 loaded");
+console.log("app.js version 623 loaded");
 
 // ==============================
-// v622 バージョン表示
+// v623 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v622";
+  badge.textContent = "v623";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "622");
+      url.searchParams.set("v", "623");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "622");
+      url.searchParams.set("v", "623");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -184,7 +184,7 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v622 で読み込まれているか\n" +
+      "1. firebase.js が v623 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK が読み込まれているか"
     );
@@ -2555,7 +2555,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v622 initialized");
+  console.log("app.js v623 initialized");
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
