@@ -304,74 +304,88 @@ function getTopicsArray() {
 }
 
 function pickTopicPair() {
+  const DEFAULT_TOPIC_PAIRS = [
+    { normalTopic: "猫", fakeTopic: "虎" },
+    { normalTopic: "犬", fakeTopic: "狼" },
+    { normalTopic: "りんご", fakeTopic: "トマト" },
+    { normalTopic: "バナナ", fakeTopic: "とうもろこし" },
+    { normalTopic: "車", fakeTopic: "バス" },
+    { normalTopic: "電車", fakeTopic: "新幹線" },
+    { normalTopic: "飛行機", fakeTopic: "鳥" },
+    { normalTopic: "魚", fakeTopic: "イルカ" },
+    { normalTopic: "カレー", fakeTopic: "シチュー" },
+    { normalTopic: "ラーメン", fakeTopic: "うどん" },
+    { normalTopic: "寿司", fakeTopic: "おにぎり" },
+    { normalTopic: "ケーキ", fakeTopic: "プリン" },
+    { normalTopic: "サッカー", fakeTopic: "バスケ" },
+    { normalTopic: "野球", fakeTopic: "テニス" },
+    { normalTopic: "学校", fakeTopic: "病院" },
+    { normalTopic: "家", fakeTopic: "城" },
+    { normalTopic: "スマホ", fakeTopic: "テレビ" },
+    { normalTopic: "時計", fakeTopic: "コンパス" },
+    { normalTopic: "太陽", fakeTopic: "月" },
+    { normalTopic: "雪だるま", fakeTopic: "ロボット" }
+  ];
+
   try {
     const topics = getTopicsArray();
 
+    // topics.js にペア形式がある場合はそれを優先
     if (topics.length > 0) {
-      const raw = topics[Math.floor(Math.random() * topics.length)];
+      const pairCandidates = topics
+        .map((raw) => {
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
 
-      // { normal: ..., fake: ... } 形式
-      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-        const normalCandidate =
-          raw.normal ??
-          raw.citizen ??
-          raw.main ??
-          raw.word ??
-          raw.topic ??
-          raw.name ??
-          raw.answer;
+          const normalCandidate =
+            raw.normal ??
+            raw.normalTopic ??
+            raw.citizen ??
+            raw.main ??
+            raw.word ??
+            raw.topic ??
+            raw.name ??
+            raw.answer;
 
-        const fakeCandidate =
-          raw.fake ??
-          raw.fakeTopic ??
-          raw.fake_word ??
-          raw.fakeWord ??
-          raw.nise ??
-          raw.fakeArtist;
+          const fakeCandidate =
+            raw.fake ??
+            raw.fakeTopic ??
+            raw.fake_word ??
+            raw.fakeWord ??
+            raw.nise ??
+            raw.fakeArtist;
 
-        const normalText = getTopicTextFromAny(normalCandidate);
-        const fakeText = getTopicTextFromAny(fakeCandidate);
+          const normalText = getTopicTextFromAny(normalCandidate);
+          const fakeText = getTopicTextFromAny(fakeCandidate);
 
-        if (normalText && fakeText && normalText !== "[object Object]" && fakeText !== "[object Object]") {
-          return {
-            normalTopic: normalText,
-            fakeTopic: fakeText
-          };
-        }
+          if (
+            normalText &&
+            fakeText &&
+            normalText !== "[object Object]" &&
+            fakeText !== "[object Object]" &&
+            normalText !== fakeText
+          ) {
+            return {
+              normalTopic: normalText,
+              fakeTopic: fakeText
+            };
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      if (pairCandidates.length > 0) {
+        return pairCandidates[Math.floor(Math.random() * pairCandidates.length)];
       }
-
-      // 単体文字列・単体オブジェクト形式
-      const normalTopic = getTopicTextFromAny(raw) || "猫";
-      let fakeTopic = normalTopic;
-
-      if (topics.length >= 2) {
-        let guard = 0;
-
-        while (fakeTopic === normalTopic && guard < 50) {
-          const other = topics[Math.floor(Math.random() * topics.length)];
-          fakeTopic = getTopicTextFromAny(other) || normalTopic;
-          guard++;
-        }
-      }
-
-      if (!fakeTopic || fakeTopic === normalTopic || fakeTopic === "[object Object]") {
-        fakeTopic = normalTopic === "猫" ? "虎" : "猫";
-      }
-
-      return {
-        normalTopic,
-        fakeTopic
-      };
     }
   } catch (error) {
-    console.error("お題ペア作成失敗:", error);
+    console.error("topics.jsのお題ペア取得失敗:", error);
   }
 
-  return {
-    normalTopic: "猫",
-    fakeTopic: "虎"
-  };
+  // ペア形式がない場合は自然なお題ペアを使う
+  return DEFAULT_TOPIC_PAIRS[Math.floor(Math.random() * DEFAULT_TOPIC_PAIRS.length)];
 }
+
 
 
 
@@ -500,6 +514,15 @@ function startOnlineListeners() {
     updateLobbyControlButtons();
 
     if (!room) return;
+
+    // v619: ホストが「もう一度遊ぶ」を押して lobby に戻したら全員ロビーへ戻る
+    if (room.status === "lobby" && resultShown) {
+      resetLocalRoundStateForLobby();
+      showScreen("lobby-screen");
+      updateLobbyControlButtons();
+      return;
+    }
+
 
     if (room.status === "playing" && !onlineTopicHandled) {
       onlineTopicHandled = true;
@@ -1323,6 +1346,56 @@ function checkAllVotesAndShowResult(votes) {
   }
 }
 
+function addReplayButtonIfHost() {
+  const resultDisplay = $("result-display");
+  if (!resultDisplay) return;
+
+  const oldReplay = $("replay-box");
+  if (oldReplay) oldReplay.remove();
+
+  if (!isCurrentUserHost()) {
+    return;
+  }
+
+  const box = document.createElement("div");
+  box.id = "replay-box";
+  box.className = "replay-box";
+
+  box.innerHTML = `
+    <button id="replay-btn" class="primary-btn" type="button">
+      もう一度遊ぶ
+    </button>
+    <p class="note">ホストだけがロビーに戻せます。</p>
+  `;
+
+  resultDisplay.appendChild(box);
+
+  const replayBtn = $("replay-btn");
+
+  if (replayBtn) {
+    replayBtn.addEventListener("click", async () => {
+      try {
+        replayBtn.disabled = true;
+        replayBtn.textContent = "ロビーに戻しています...";
+
+        const GameDB = requireGameDB();
+        await GameDB.resetRoomToLobby(currentRoomId);
+      } catch (error) {
+        console.error("もう一度遊ぶ失敗:", error);
+        alert(
+          "もう一度遊ぶに失敗しました。\n\n" +
+          "code: " + (error.code || "なし") + "\n" +
+          "message: " + (error.message || error)
+        );
+
+        replayBtn.disabled = false;
+        replayBtn.textContent = "もう一度遊ぶ";
+      }
+    });
+  }
+}
+
+
 function showVoteScreen() {
   hasVoted = false;
   resultShown = false;
@@ -1543,6 +1616,63 @@ function showSyncedResultScreen(votes) {
   }
 
   showScreen("result-screen");
+}
+
+
+function resetLocalRoundStateForLobby() {
+  cancelAnimationFrame(timerAnimationId);
+  cancelAnimationFrame(reviewTimerAnimationId);
+
+  if (reviewGalleryUnsubscribe) {
+    try {
+      reviewGalleryUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+    reviewGalleryUnsubscribe = null;
+  }
+
+  if (voteUnsubscribe) {
+    try {
+      voteUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+    voteUnsubscribe = null;
+  }
+
+  currentTopic = null;
+  myAssignment = null;
+  isFakeArtist = false;
+
+  onlineTopicHandled = false;
+  drawingPhase = 1;
+  phaseEnding = false;
+
+  midImageDataUrl = null;
+  finalImageDataUrl = null;
+
+  hasVoted = false;
+  resultShown = false;
+  latestVotes = [];
+
+  strokes = [];
+  currentStroke = null;
+
+  const voteList = $("vote-list");
+  if (voteList) voteList.innerHTML = "";
+
+  const resultDisplay = $("result-display");
+  if (resultDisplay) resultDisplay.innerHTML = "";
+
+  const oldStatus = $("vote-status-box");
+  if (oldStatus) oldStatus.remove();
+
+  const oldReplay = $("replay-box");
+  if (oldReplay) oldReplay.remove();
+
+  const roleBox = $("role-display-box");
+  if (roleBox) roleBox.remove();
 }
 
 
