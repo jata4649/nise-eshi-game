@@ -1,7 +1,7 @@
-console.log("app.js version 620 loaded");
+console.log("app.js version 621 loaded");
 
 // ==============================
-// v620 バージョン表示
+// v621 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v620";
+  badge.textContent = "v621";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "620");
+      url.searchParams.set("v", "621");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "620");
+      url.searchParams.set("v", "621");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -135,6 +135,7 @@ const SECOND_DRAW_SECONDS = 25;
 const MID_DISCUSSION_SECONDS = 60;
 const FINAL_DISCUSSION_SECONDS = 60;
 const RUNOFF_DISCUSSION_SECONDS = 60;
+const RUNOFF_LIMIT = 2;
 const LOGICAL_CANVAS_SIZE = 1000;
 
 
@@ -183,7 +184,7 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v620 で読み込まれているか\n" +
+      "1. firebase.js が v621 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK が読み込まれているか"
     );
@@ -320,7 +321,7 @@ function getTopicsArray() {
 
 
 // ==============================
-// お題ペア v620 大量追加
+// お題ペア v621 大量追加
 // ==============================
 function pickTopicPair() {
   const DEFAULT_TOPIC_PAIRS = [
@@ -1278,7 +1279,7 @@ function getCanvasImage() {
 
 
 // ==============================
-// 描画フェーズ v620 同期
+// 描画フェーズ v621 同期
 // ==============================
 function startFirstDrawingSynced(room) {
   drawingPhase = 1;
@@ -1488,7 +1489,7 @@ function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
 
 
 // ==============================
-// 公開・討論 v620 同期
+// 公開・討論 v621 同期
 // ==============================
 function showMidReviewSynced(room) {
   const phaseLabel = $("review-phase-label");
@@ -1593,7 +1594,7 @@ function showRunoffDiscussionScreen(room) {
 
 
 // ==============================
-// 投票・結果同期 v620
+// 投票・結果同期 v621
 // ==============================
 function getValidVotingPlayers() {
   if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
@@ -1622,7 +1623,6 @@ function getMyVote(votes) {
 
   return (votes || []).find((vote) => vote.uid === myUid) || null;
 }
-
 function renderVoteWaiting(votes) {
   const voteList = $("vote-list");
   if (!voteList) return;
@@ -1641,19 +1641,52 @@ function renderVoteWaiting(votes) {
   }
 
   const myVote = getMyVote(votes);
+  const votedUidSet = new Set((votes || []).map((vote) => vote.uid));
+
+  const notVotedPlayers = players.filter((player) => {
+    return player && player.uid && !votedUidSet.has(player.uid);
+  });
+
+  const notVotedNames = notVotedPlayers.map((player) => {
+    return escapeHtml(player.name || "名無し");
+  });
+
+  const roundLabel = currentVoteRound === "main"
+    ? "通常投票"
+    : `再投票 ${currentRoomData && currentRoomData.runoffRound ? currentRoomData.runoffRound : ""}`;
+
+  let notVotedHtml = "";
+
+  if (notVotedNames.length > 0) {
+    notVotedHtml = `
+      <div class="not-voted-box">
+        <strong>未投票</strong>
+        <p>${notVotedNames.join("、")}</p>
+      </div>
+    `;
+  } else {
+    notVotedHtml = `
+      <div class="not-voted-box all-voted">
+        <strong>全員投票済み</strong>
+        <p>結果を集計しています...</p>
+      </div>
+    `;
+  }
 
   if (myVote) {
     hasVoted = true;
     status.innerHTML = `
-      <strong>投票済み</strong>
+      <strong>${roundLabel}：投票済み</strong>
       <p>${escapeHtml(myVote.votedName || "名無し")} に投票しました。</p>
       <p>全員の投票を待っています。 ${voteCount} / ${playerCount}</p>
+      ${notVotedHtml}
     `;
   } else {
     status.innerHTML = `
-      <strong>投票してください</strong>
+      <strong>${roundLabel}：投票してください</strong>
       <p>全員の投票が終わると、自動で次へ進みます。</p>
       <p>現在の投票数：${voteCount} / ${playerCount}</p>
+      ${notVotedHtml}
     `;
   }
 
@@ -1887,23 +1920,41 @@ async function decideOutcomeAsHost(votes, round) {
     const voteResult = buildVoteResult(votes || [], candidates);
 
     const topPlayers = voteResult.topPlayers;
-
-    if (topPlayers.length > 1) {
-      const currentRunoffRound = Number(currentRoomData.runoffRound || 0);
-      const nextRunoffRound = currentRunoffRound + 1;
-
-      const runoffCandidates = topPlayers.map((player) => ({
-        uid: player.uid,
-        name: player.name || "名無し",
-        count: player.count || 0
-      }));
-
-      await GameDB.setRunoff(currentRoomId, runoffCandidates, nextRunoffRound);
-      return;
-    }
-
     const answer = currentRoomData && currentRoomData.answer ? currentRoomData.answer : null;
     const fakeUid = answer ? answer.fakeUid : null;
+
+    const currentRunoffRound = Number(currentRoomData.runoffRound || 0);
+
+    if (topPlayers.length > 1) {
+      if (currentRunoffRound < RUNOFF_LIMIT) {
+        const nextRunoffRound = currentRunoffRound + 1;
+
+        const runoffCandidates = topPlayers.map((player) => ({
+          uid: player.uid,
+          name: player.name || "名無し",
+          count: player.count || 0
+        }));
+
+        await GameDB.setRunoff(currentRoomId, runoffCandidates, nextRunoffRound);
+        return;
+      }
+
+      const resultData = {
+        voteRound: round,
+        results: voteResult.results,
+        topPlayers: voteResult.topPlayers,
+        maxCount: voteResult.maxCount,
+        answer: answer,
+        winner: "fake",
+        finalTie: true,
+        reason: "runoff_limit_tie",
+        runoffLimit: RUNOFF_LIMIT,
+        createdAtMs: Date.now()
+      };
+
+      await GameDB.setResult(currentRoomId, resultData);
+      return;
+    }
 
     const votedFake = topPlayers.some((player) => player.uid === fakeUid);
     const winner = votedFake ? "citizen" : "fake";
@@ -1915,6 +1966,9 @@ async function decideOutcomeAsHost(votes, round) {
       maxCount: voteResult.maxCount,
       answer: answer,
       winner: winner,
+      finalTie: false,
+      reason: votedFake ? "fake_found" : "fake_escaped",
+      runoffLimit: RUNOFF_LIMIT,
       createdAtMs: Date.now()
     };
 
@@ -2015,6 +2069,8 @@ function showSyncedResultScreen(resultData) {
   const topPlayers = Array.isArray(data.topPlayers) ? data.topPlayers : [];
   const answer = data.answer || (currentRoomData && currentRoomData.answer ? currentRoomData.answer : null);
   const winner = data.winner || "unknown";
+  const finalTie = data.finalTie === true;
+  const reason = data.reason || "";
 
   let topText = "";
 
@@ -2023,7 +2079,32 @@ function showSyncedResultScreen(resultData) {
   } else if (topPlayers.length === 1) {
     topText = `一番疑われた人：${escapeHtml(topPlayers[0].name || "名無し")}`;
   } else {
-    topText = `同票：${topPlayers.map((player) => escapeHtml(player.name || "名無し")).join("、")}`;
+    topText = `最終同票：${topPlayers.map((player) => escapeHtml(player.name || "名無し")).join("、")}`;
+  }
+
+  let reasonHtml = "";
+
+  if (finalTie || reason === "runoff_limit_tie") {
+    reasonHtml = `
+      <div class="result-reason-box fake-escape">
+        <strong>同票のまま決着！</strong>
+        <p>再投票を${escapeHtml(data.runoffLimit || RUNOFF_LIMIT)}回行っても決着しなかったため、ニセ絵師の逃げ切り勝利です。</p>
+      </div>
+    `;
+  } else if (reason === "fake_found") {
+    reasonHtml = `
+      <div class="result-reason-box citizen-success">
+        <strong>ニセ絵師を見つけました！</strong>
+        <p>最多票がニセ絵師に集まりました。</p>
+      </div>
+    `;
+  } else if (reason === "fake_escaped") {
+    reasonHtml = `
+      <div class="result-reason-box fake-escape">
+        <strong>ニセ絵師が逃げ切りました！</strong>
+        <p>最多票がニセ絵師以外に集まりました。</p>
+      </div>
+    `;
   }
 
   let answerHtml = "";
@@ -2074,6 +2155,7 @@ function showSyncedResultScreen(resultData) {
 
   let resultHtml = `
     ${answerHtml}
+    ${reasonHtml}
 
     <div class="result-message">
       <h3>${topText}</h3>
@@ -2085,17 +2167,19 @@ function showSyncedResultScreen(resultData) {
 
   results.forEach((result) => {
     const isFake = answer && result.uid === answer.fakeUid;
+    const isTop = topPlayers.some((player) => player.uid === result.uid);
 
     const votersText = result.voters && result.voters.length > 0
       ? result.voters.map((name) => escapeHtml(name)).join("、")
       : "なし";
 
     resultHtml += `
-      <div class="vote-result-item ${isFake ? "fake-result-highlight" : ""}">
+      <div class="vote-result-item ${isFake ? "fake-result-highlight" : ""} ${isTop ? "top-voted-highlight" : ""}">
         <div class="vote-result-main">
           <strong>
             ${escapeHtml(result.name || "名無し")}
             ${isFake ? '<span class="fake-badge-inline">ニセ絵師</span>' : ""}
+            ${isTop ? '<span class="top-badge-inline">最多票</span>' : ""}
           </strong>
           <span>${result.count || 0}票</span>
         </div>
@@ -2393,7 +2477,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v620 initialized");
+  console.log("app.js v621 initialized");
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
