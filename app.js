@@ -228,35 +228,67 @@ function canHostStartGame() {
 }
 
 function topicToText(topic) {
-  if (topic == null) return "？？？";
-
-  if (typeof topic === "string") return topic;
-
-  if (typeof topic === "object") {
-    if (topic.word) return topic.word;
-    if (topic.topic) return topic.topic;
-    if (topic.name) return topic.name;
-    if (topic.normal) return topic.normal;
-    if (topic.answer) return topic.answer;
-  }
-
-  return String(topic);
+  return getTopicTextFromAny(topic) || "？？？";
 }
 
 function getTopicTextFromAny(topic) {
   if (topic == null) return null;
 
-  if (typeof topic === "string") return topic;
-
-  if (typeof topic === "object") {
-    if (topic.word) return String(topic.word);
-    if (topic.topic) return String(topic.topic);
-    if (topic.name) return String(topic.name);
-    if (topic.normal) return String(topic.normal);
-    if (topic.answer) return String(topic.answer);
+  if (typeof topic === "string") {
+    return topic;
   }
 
-  return String(topic);
+  if (typeof topic === "number" || typeof topic === "boolean") {
+    return String(topic);
+  }
+
+  if (Array.isArray(topic)) {
+    if (topic.length === 0) return null;
+    return getTopicTextFromAny(topic[0]);
+  }
+
+  if (typeof topic === "object") {
+    const keys = [
+      "word",
+      "topic",
+      "name",
+      "normal",
+      "fake",
+      "main",
+      "citizen",
+      "answer",
+      "text",
+      "title",
+      "label",
+      "value"
+    ];
+
+    for (const key of keys) {
+      if (topic[key] != null) {
+        const text = getTopicTextFromAny(topic[key]);
+        if (text && text !== "[object Object]") {
+          return text;
+        }
+      }
+    }
+
+    // どうしても取れない場合、最初の値を使う
+    const values = Object.values(topic);
+    for (const value of values) {
+      const text = getTopicTextFromAny(value);
+      if (text && text !== "[object Object]") {
+        return text;
+      }
+    }
+  }
+
+  const fallback = String(topic);
+
+  if (fallback === "[object Object]") {
+    return null;
+  }
+
+  return fallback;
 }
 
 function getTopicsArray() {
@@ -278,46 +310,58 @@ function pickTopicPair() {
     if (topics.length > 0) {
       const raw = topics[Math.floor(Math.random() * topics.length)];
 
-      if (raw && typeof raw === "object") {
-        if (raw.normal && raw.fake) {
-          return {
-            normalTopic: String(raw.normal),
-            fakeTopic: String(raw.fake)
-          };
-        }
+      // { normal: ..., fake: ... } 形式
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        const normalCandidate =
+          raw.normal ??
+          raw.citizen ??
+          raw.main ??
+          raw.word ??
+          raw.topic ??
+          raw.name ??
+          raw.answer;
 
-        if (raw.main && raw.fake) {
-          return {
-            normalTopic: String(raw.main),
-            fakeTopic: String(raw.fake)
-          };
-        }
+        const fakeCandidate =
+          raw.fake ??
+          raw.fakeTopic ??
+          raw.fake_word ??
+          raw.fakeWord ??
+          raw.nise ??
+          raw.fakeArtist;
 
-        if (raw.citizen && raw.fake) {
+        const normalText = getTopicTextFromAny(normalCandidate);
+        const fakeText = getTopicTextFromAny(fakeCandidate);
+
+        if (normalText && fakeText && normalText !== "[object Object]" && fakeText !== "[object Object]") {
           return {
-            normalTopic: String(raw.citizen),
-            fakeTopic: String(raw.fake)
+            normalTopic: normalText,
+            fakeTopic: fakeText
           };
         }
       }
 
+      // 単体文字列・単体オブジェクト形式
       const normalTopic = getTopicTextFromAny(raw) || "猫";
       let fakeTopic = normalTopic;
 
       if (topics.length >= 2) {
         let guard = 0;
-        while (fakeTopic === normalTopic && guard < 30) {
+
+        while (fakeTopic === normalTopic && guard < 50) {
           const other = topics[Math.floor(Math.random() * topics.length)];
           fakeTopic = getTopicTextFromAny(other) || normalTopic;
           guard++;
         }
       }
 
-      if (fakeTopic === normalTopic) {
+      if (!fakeTopic || fakeTopic === normalTopic || fakeTopic === "[object Object]") {
         fakeTopic = normalTopic === "猫" ? "虎" : "猫";
       }
 
-      return { normalTopic, fakeTopic };
+      return {
+        normalTopic,
+        fakeTopic
+      };
     }
   } catch (error) {
     console.error("お題ペア作成失敗:", error);
@@ -327,6 +371,20 @@ function pickTopicPair() {
     normalTopic: "猫",
     fakeTopic: "虎"
   };
+}
+
+
+
+function getTopicsArray() {
+  if (Array.isArray(window.TOPICS) && window.TOPICS.length > 0) {
+    return window.TOPICS;
+  }
+
+  if (typeof TOPICS !== "undefined" && Array.isArray(TOPICS) && TOPICS.length > 0) {
+    return TOPICS;
+  }
+
+  return [];
 }
 
 function pickFakePlayer(players) {
