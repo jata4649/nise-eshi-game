@@ -321,147 +321,18 @@ function getTopicsArray() {
 
 
 // ==============================
-// お題ペア v621 大量追加
+// お題ペア v623 topics.jsから取得
 // ==============================
 function pickTopicPair() {
-  const DEFAULT_TOPIC_PAIRS = [
-    { normalTopic: "猫", fakeTopic: "虎" },
-    { normalTopic: "犬", fakeTopic: "狼" },
-    { normalTopic: "りんご", fakeTopic: "トマト" },
-    { normalTopic: "バナナ", fakeTopic: "とうもろこし" },
-    { normalTopic: "車", fakeTopic: "バス" },
-    { normalTopic: "電車", fakeTopic: "新幹線" },
-    { normalTopic: "飛行機", fakeTopic: "鳥" },
-    { normalTopic: "魚", fakeTopic: "イルカ" },
-    { normalTopic: "カレー", fakeTopic: "シチュー" },
-    { normalTopic: "ラーメン", fakeTopic: "うどん" },
-    { normalTopic: "寿司", fakeTopic: "おにぎり" },
-    { normalTopic: "ケーキ", fakeTopic: "プリン" },
-    { normalTopic: "サッカー", fakeTopic: "バスケ" },
-    { normalTopic: "野球", fakeTopic: "テニス" },
-    { normalTopic: "学校", fakeTopic: "病院" },
-    { normalTopic: "家", fakeTopic: "城" },
-    { normalTopic: "スマホ", fakeTopic: "テレビ" },
-    { normalTopic: "時計", fakeTopic: "コンパス" },
-    { normalTopic: "太陽", fakeTopic: "月" },
-    { normalTopic: "雪だるま", fakeTopic: "ロボット" },
-
-    { normalTopic: "うさぎ", fakeTopic: "カンガルー" },
-    { normalTopic: "パンダ", fakeTopic: "シロクマ" },
-    { normalTopic: "ライオン", fakeTopic: "チーター" },
-    { normalTopic: "ゾウ", fakeTopic: "マンモス" },
-    { normalTopic: "キリン", fakeTopic: "首長竜" },
-    { normalTopic: "ペンギン", fakeTopic: "アヒル" },
-    { normalTopic: "ニワトリ", fakeTopic: "孔雀" },
-    { normalTopic: "カエル", fakeTopic: "トカゲ" },
-    { normalTopic: "カメ", fakeTopic: "恐竜" },
-    { normalTopic: "サメ", fakeTopic: "クジラ" },
-
-    { normalTopic: "いちご", fakeTopic: "さくらんぼ" },
-    { normalTopic: "みかん", fakeTopic: "レモン" },
-    { normalTopic: "ぶどう", fakeTopic: "ブルーベリー" },
-    { normalTopic: "スイカ", fakeTopic: "メロン" },
-    { normalTopic: "もも", fakeTopic: "りんご" },
-    { normalTopic: "なし", fakeTopic: "りんご" },
-    { normalTopic: "パイナップル", fakeTopic: "サボテン" },
-    { normalTopic: "にんじん", fakeTopic: "大根" },
-    { normalTopic: "じゃがいも", fakeTopic: "さつまいも" },
-    { normalTopic: "きゅうり", fakeTopic: "ナス" },
-
-    { normalTopic: "ハンバーガー", fakeTopic: "サンドイッチ" },
-    { normalTopic: "ピザ", fakeTopic: "お好み焼き" },
-    { normalTopic: "たこ焼き", fakeTopic: "団子" },
-    { normalTopic: "焼きそば", fakeTopic: "スパゲッティ" },
-    { normalTopic: "ドーナツ", fakeTopic: "ベーグル" },
-    { normalTopic: "アイス", fakeTopic: "かき氷" },
-    { normalTopic: "チョコ", fakeTopic: "クッキー" },
-    { normalTopic: "パン", fakeTopic: "クロワッサン" },
-    { normalTopic: "目玉焼き", fakeTopic: "オムレツ" },
-    { normalTopic: "牛乳", fakeTopic: "ヨーグルト" },
-
-    { normalTopic: "自転車", fakeTopic: "バイク" },
-    { normalTopic: "船", fakeTopic: "潜水艦" },
-    { normalTopic: "ヘリコプター", fakeTopic: "ドローン" },
-    { normalTopic: "トラック", fakeTopic: "消防車" },
-    { normalTopic: "パトカー", fakeTopic: "救急車" },
-    { normalTopic: "タクシー", fakeTopic: "リムジン" },
-    { normalTopic: "ロケット", fakeTopic: "ミサイル" },
-    { normalTopic: "気球", fakeTopic: "パラシュート" },
-    { normalTopic: "スケボー", fakeTopic: "スキー" },
-    { normalTopic: "ローラースケート", fakeTopic: "スケート靴" },
-
-    { normalTopic: "鉛筆", fakeTopic: "ペン" },
-    { normalTopic: "消しゴム", fakeTopic: "石けん" },
-    { normalTopic: "はさみ", fakeTopic: "カニ" },
-    { normalTopic: "傘", fakeTopic: "きのこ" },
-    { normalTopic: "靴", fakeTopic: "スリッパ" },
-    { normalTopic: "帽子", fakeTopic: "ヘルメット" },
-    { normalTopic: "メガネ", fakeTopic: "双眼鏡" },
-    { normalTopic: "カバン", fakeTopic: "ランドセル" },
-    { normalTopic: "鍵", fakeTopic: "スプーン" },
-    { normalTopic: "マイク", fakeTopic: "懐中電灯" },
-
-    { normalTopic: "富士山", fakeTopic: "ピラミッド" },
-    { normalTopic: "海", fakeTopic: "プール" },
-    { normalTopic: "川", fakeTopic: "道路" },
-    { normalTopic: "森", fakeTopic: "公園" },
-    { normalTopic: "砂漠", fakeTopic: "ビーチ" },
-    { normalTopic: "火山", fakeTopic: "山" },
-    { normalTopic: "滝", fakeTopic: "シャワー" },
-    { normalTopic: "雲", fakeTopic: "綿あめ" },
-    { normalTopic: "雨", fakeTopic: "涙" },
-    { normalTopic: "虹", fakeTopic: "橋" },
-
-    { normalTopic: "警察官", fakeTopic: "探偵" },
-    { normalTopic: "医者", fakeTopic: "科学者" },
-    { normalTopic: "先生", fakeTopic: "店員" },
-    { normalTopic: "忍者", fakeTopic: "侍" },
-    { normalTopic: "魔法使い", fakeTopic: "魔女" },
-    { normalTopic: "宇宙飛行士", fakeTopic: "ロボット" },
-    { normalTopic: "王様", fakeTopic: "サンタ" },
-    { normalTopic: "海賊", fakeTopic: "船長" },
-    { normalTopic: "シェフ", fakeTopic: "寿司職人" },
-    { normalTopic: "アイドル", fakeTopic: "ダンサー" },
-
-    { normalTopic: "ピアノ", fakeTopic: "オルガン" },
-    { normalTopic: "ギター", fakeTopic: "バイオリン" },
-    { normalTopic: "太鼓", fakeTopic: "ドラム" },
-    { normalTopic: "笛", fakeTopic: "ラッパ" },
-    { normalTopic: "テレビ", fakeTopic: "映画館" },
-    { normalTopic: "本", fakeTopic: "ノート" },
-    { normalTopic: "ゲーム機", fakeTopic: "リモコン" },
-    { normalTopic: "カメラ", fakeTopic: "スマホ" },
-    { normalTopic: "パソコン", fakeTopic: "レジ" },
-    { normalTopic: "イヤホン", fakeTopic: "聴診器" },
-
-    { normalTopic: "ハート", fakeTopic: "桃" },
-    { normalTopic: "星", fakeTopic: "ヒトデ" },
-    { normalTopic: "丸", fakeTopic: "ボール" },
-    { normalTopic: "四角", fakeTopic: "テレビ" },
-    { normalTopic: "三角", fakeTopic: "おにぎり" },
-    { normalTopic: "リボン", fakeTopic: "蝶々" },
-    { normalTopic: "花", fakeTopic: "風車" },
-    { normalTopic: "木", fakeTopic: "ブロッコリー" },
-    { normalTopic: "葉っぱ", fakeTopic: "羽" },
-    { normalTopic: "炎", fakeTopic: "唐辛子" },
-
-    { normalTopic: "おばけ", fakeTopic: "クラゲ" },
-    { normalTopic: "ドラゴン", fakeTopic: "恐竜" },
-    { normalTopic: "ユニコーン", fakeTopic: "馬" },
-    { normalTopic: "天使", fakeTopic: "妖精" },
-    { normalTopic: "悪魔", fakeTopic: "コウモリ" },
-    { normalTopic: "ゾンビ", fakeTopic: "ミイラ" },
-    { normalTopic: "吸血鬼", fakeTopic: "魔法使い" },
-    { normalTopic: "人魚", fakeTopic: "魚" },
-    { normalTopic: "サンタ", fakeTopic: "雪だるま" },
-    { normalTopic: "鬼", fakeTopic: "レスラー" }
-  ];
-
   try {
-    const topics = getTopicsArray();
+    let pairs = [];
 
-    if (topics.length > 0) {
-      const pairCandidates = topics
+    if (Array.isArray(window.TOPIC_PAIRS) && window.TOPIC_PAIRS.length > 0) {
+      pairs = window.TOPIC_PAIRS;
+    } else {
+      const topics = getTopicsArray();
+
+      pairs = topics
         .map((raw) => {
           if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
 
@@ -495,24 +366,40 @@ function pickTopicPair() {
           ) {
             return {
               normalTopic: normalText,
-              fakeTopic: fakeText
+              fakeTopic: fakeText,
+              category: raw.category || "未分類"
             };
           }
 
           return null;
         })
         .filter(Boolean);
+    }
 
-      if (pairCandidates.length > 0) {
-        return pairCandidates[Math.floor(Math.random() * pairCandidates.length)];
-      }
+    if (pairs.length > 0) {
+      const pair = pairs[Math.floor(Math.random() * pairs.length)];
+
+      return {
+        normalTopic: getTopicTextFromAny(pair.normalTopic ?? pair.normal ?? pair.word ?? pair.topic),
+        fakeTopic: getTopicTextFromAny(pair.fakeTopic ?? pair.fake ?? pair.nise),
+        category: pair.category || "未分類"
+      };
     }
   } catch (error) {
-    console.error("topics.jsのお題ペア取得失敗:", error);
+    console.error("お題ペア取得失敗:", error);
   }
 
-  return DEFAULT_TOPIC_PAIRS[Math.floor(Math.random() * DEFAULT_TOPIC_PAIRS.length)];
+  // 最低限の保険
+  const fallbackPairs = [
+    { normalTopic: "猫", fakeTopic: "虎", category: "動物" },
+    { normalTopic: "犬", fakeTopic: "狼", category: "動物" },
+    { normalTopic: "りんご", fakeTopic: "トマト", category: "食べ物" },
+    { normalTopic: "車", fakeTopic: "バス", category: "乗り物" }
+  ];
+
+  return fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)];
 }
+
 
 function pickFakePlayer(players) {
   const validPlayers = (players || []).filter((player) => player && player.uid);
