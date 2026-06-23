@@ -263,33 +263,6 @@ function listenPlayers(roomId, callback) {
   return unsubscribePlayers;
 }
 
-// ==============================
-// 自分のお題・役割を取得 v617
-// ==============================
-async function getMyAssignment(roomId) {
-  const uid = await signIn();
-  const cleanRoomId = normalizeRoomId(roomId);
-
-  if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
-  }
-
-  const snap = await db
-    .collection("rooms")
-    .doc(cleanRoomId)
-    .collection("assignments")
-    .doc(uid)
-    .get();
-
-  if (!snap.exists) {
-    throw new Error("自分のお題がまだ配られていません");
-  }
-
-  return {
-    id: snap.id,
-    ...snap.data()
-  };
-}
 
 // ==============================
 // 部屋監視
@@ -331,6 +304,35 @@ function listenRoom(roomId, callback) {
     );
 
   return unsubscribeRoom;
+}
+
+
+// ==============================
+// 自分のお題・役割を取得 v617
+// ==============================
+async function getMyAssignment(roomId) {
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  const snap = await db
+    .collection("rooms")
+    .doc(cleanRoomId)
+    .collection("assignments")
+    .doc(uid)
+    .get();
+
+  if (!snap.exists) {
+    throw new Error("自分のお題がまだ配られていません");
+  }
+
+  return {
+    id: snap.id,
+    ...snap.data()
+  };
 }
 
 
@@ -377,9 +379,9 @@ async function startGame(roomId, gameSetup) {
     throw new Error("ゲーム設定が不正です");
   }
 
-  const normalTopic = gameSetup.normalTopic;
-  const fakeTopic = gameSetup.fakeTopic;
-  const fakeUid = gameSetup.fakeUid;
+  const normalTopic = String(gameSetup.normalTopic);
+  const fakeTopic = String(gameSetup.fakeTopic);
+  const fakeUid = String(gameSetup.fakeUid);
 
   const fakePlayer = players.find((player) => player.uid === fakeUid);
 
@@ -435,14 +437,13 @@ async function startGame(roomId, gameSetup) {
   console.log("ゲーム開始 v617:", {
     roomId: cleanRoomId,
     fakeUid,
-    fakeName: fakePlayer.name,
+    fakeName: fakePlayer.name || "名無し",
     normalTopic,
     fakeTopic
   });
 }
 
 const startOnlineGame = startGame;
-
 
 
 // ==============================
@@ -524,4 +525,194 @@ function listenDrawings(roomId, phase, callback) {
         drawings.sort((a, b) => {
           const nameA = a.name || "";
           const nameB = b.name || "";
-          return nameA.localeCompare(name
+          return nameA.localeCompare(nameB, "ja");
+        });
+
+        console.log("drawings更新:", phase, drawings);
+        callback(drawings);
+      },
+      (error) => {
+        console.error("drawings監視エラー:", error);
+      }
+    );
+
+  return unsubscribeDrawings;
+}
+
+
+// ==============================
+// 投票を保存
+// ==============================
+async function saveVote(roomId, votedPlayer) {
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  if (!votedPlayer || !votedPlayer.uid) {
+    throw new Error("投票先が不正です");
+  }
+
+  let myName = "名無し";
+
+  try {
+    const myPlayerSnap = await db
+      .collection("rooms")
+      .doc(cleanRoomId)
+      .collection("players")
+      .doc(uid)
+      .get();
+
+    if (myPlayerSnap.exists) {
+      myName = myPlayerSnap.data().name || "名無し";
+    }
+  } catch (error) {
+    console.warn("自分の名前取得失敗:", error);
+  }
+
+  await db
+    .collection("rooms")
+    .doc(cleanRoomId)
+    .collection("votes")
+    .doc(uid)
+    .set(
+      {
+        uid: uid,
+        name: myName,
+        votedUid: votedPlayer.uid,
+        votedName: votedPlayer.name || "名無し",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+
+  console.log("投票保存:", cleanRoomId, uid, "->", votedPlayer.uid);
+}
+
+
+// ==============================
+// 投票を監視
+// ==============================
+function listenVotes(roomId, callback) {
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  if (unsubscribeVotes) {
+    unsubscribeVotes();
+    unsubscribeVotes = null;
+  }
+
+  unsubscribeVotes = db
+    .collection("rooms")
+    .doc(cleanRoomId)
+    .collection("votes")
+    .onSnapshot(
+      (snapshot) => {
+        const votes = [];
+
+        snapshot.forEach((doc) => {
+          votes.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+
+        console.log("votes更新:", votes);
+        callback(votes);
+      },
+      (error) => {
+        console.error("votes監視エラー:", error);
+      }
+    );
+
+  return unsubscribeVotes;
+}
+
+
+// ==============================
+// 投票を削除
+// ==============================
+async function clearVotes(roomId) {
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  await signIn();
+
+  const snapshot = await db
+    .collection("rooms")
+    .doc(cleanRoomId)
+    .collection("votes")
+    .get();
+
+  const batch = db.batch();
+
+  snapshot.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  await batch.commit();
+
+  console.log("投票を削除しました:", cleanRoomId);
+}
+
+
+// ==============================
+// リスナー停止
+// ==============================
+function stopListeners() {
+  if (unsubscribePlayers) {
+    unsubscribePlayers();
+    unsubscribePlayers = null;
+  }
+
+  if (unsubscribeRoom) {
+    unsubscribeRoom();
+    unsubscribeRoom = null;
+  }
+
+  if (unsubscribeDrawings) {
+    unsubscribeDrawings();
+    unsubscribeDrawings = null;
+  }
+
+  if (unsubscribeVotes) {
+    unsubscribeVotes();
+    unsubscribeVotes = null;
+  }
+
+  console.log("Firebase リスナー停止");
+}
+
+
+// ==============================
+// app.js へ公開
+// ==============================
+window.GameDB = {
+  signIn,
+  createRoom,
+  roomExists,
+  joinRoom,
+  setReady,
+  listenPlayers,
+  listenRoom,
+  startGame,
+  startOnlineGame,
+  stopListeners,
+  getCurrentUid,
+  getMyAssignment,
+  saveDrawing,
+  listenDrawings,
+  saveVote,
+  listenVotes,
+  clearVotes
+};
+
+console.log("GameDB ready:", window.GameDB);
