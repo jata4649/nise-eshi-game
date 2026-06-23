@@ -1,7 +1,7 @@
-console.log("app.js version 619 loaded");
+console.log("app.js version 620 loaded");
 
 // ==============================
-// v619 バージョン表示
+// v620 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v619";
+  badge.textContent = "v620";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,13 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "619");
+      url.searchParams.set("v", "620");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
+
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "619");
+      url.searchParams.set("v", "620");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -99,18 +100,14 @@ let currentPlayers = [];
 let currentRoomData = null;
 
 let pendingAction = null;
-let onlineTopicHandled = false;
 
 let drawingPhase = 1;
 let phaseEnding = false;
 
 let timerAnimationId = null;
-let phaseStartTime = 0;
-let phaseDurationMs = 0;
-
 let reviewTimerAnimationId = null;
-let reviewStartTime = 0;
-let reviewDurationMs = 0;
+let syncedTimerAnimationId = null;
+let hostPhaseTimerId = null;
 
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
@@ -122,10 +119,22 @@ let hasVoted = false;
 let resultShown = false;
 let latestVotes = [];
 
+let lastHandledPhaseKey = null;
+let lastScheduledHostPhaseKey = null;
+let currentVoteRound = "main";
+let processedVoteRounds = new Set();
+
+let savedDrawingPhaseMap = {
+  mid: false,
+  final: false
+};
+
+const TOPIC_SECONDS = 5;
 const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
 const MID_DISCUSSION_SECONDS = 60;
 const FINAL_DISCUSSION_SECONDS = 60;
+const RUNOFF_DISCUSSION_SECONDS = 60;
 const LOGICAL_CANVAS_SIZE = 1000;
 
 
@@ -174,12 +183,13 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v619 で読み込まれているか\n" +
+      "1. firebase.js が v620 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK が読み込まれているか"
     );
     throw new Error("GameDB is not loaded");
   }
+
   return window.GameDB;
 }
 
@@ -229,6 +239,10 @@ function canHostStartGame() {
   return areAllGuestsReady();
 }
 
+function getPlayerByUid(uid) {
+  return currentPlayers.find((player) => player.uid === uid) || null;
+}
+
 function topicToText(topic) {
   return getTopicTextFromAny(topic) || "？？？";
 }
@@ -236,9 +250,7 @@ function topicToText(topic) {
 function getTopicTextFromAny(topic) {
   if (topic == null) return null;
 
-  if (typeof topic === "string") {
-    return topic;
-  }
+  if (typeof topic === "string") return topic;
 
   if (typeof topic === "number" || typeof topic === "boolean") {
     return String(topic);
@@ -255,7 +267,9 @@ function getTopicTextFromAny(topic) {
       "topic",
       "name",
       "normal",
+      "normalTopic",
       "fake",
+      "fakeTopic",
       "main",
       "citizen",
       "answer",
@@ -304,6 +318,10 @@ function getTopicsArray() {
   return [];
 }
 
+
+// ==============================
+// お題ペア v620 大量追加
+// ==============================
 function pickTopicPair() {
   const DEFAULT_TOPIC_PAIRS = [
     { normalTopic: "猫", fakeTopic: "虎" },
@@ -325,7 +343,117 @@ function pickTopicPair() {
     { normalTopic: "スマホ", fakeTopic: "テレビ" },
     { normalTopic: "時計", fakeTopic: "コンパス" },
     { normalTopic: "太陽", fakeTopic: "月" },
-    { normalTopic: "雪だるま", fakeTopic: "ロボット" }
+    { normalTopic: "雪だるま", fakeTopic: "ロボット" },
+
+    { normalTopic: "うさぎ", fakeTopic: "カンガルー" },
+    { normalTopic: "パンダ", fakeTopic: "シロクマ" },
+    { normalTopic: "ライオン", fakeTopic: "チーター" },
+    { normalTopic: "ゾウ", fakeTopic: "マンモス" },
+    { normalTopic: "キリン", fakeTopic: "首長竜" },
+    { normalTopic: "ペンギン", fakeTopic: "アヒル" },
+    { normalTopic: "ニワトリ", fakeTopic: "孔雀" },
+    { normalTopic: "カエル", fakeTopic: "トカゲ" },
+    { normalTopic: "カメ", fakeTopic: "恐竜" },
+    { normalTopic: "サメ", fakeTopic: "クジラ" },
+
+    { normalTopic: "いちご", fakeTopic: "さくらんぼ" },
+    { normalTopic: "みかん", fakeTopic: "レモン" },
+    { normalTopic: "ぶどう", fakeTopic: "ブルーベリー" },
+    { normalTopic: "スイカ", fakeTopic: "メロン" },
+    { normalTopic: "もも", fakeTopic: "りんご" },
+    { normalTopic: "なし", fakeTopic: "りんご" },
+    { normalTopic: "パイナップル", fakeTopic: "サボテン" },
+    { normalTopic: "にんじん", fakeTopic: "大根" },
+    { normalTopic: "じゃがいも", fakeTopic: "さつまいも" },
+    { normalTopic: "きゅうり", fakeTopic: "ナス" },
+
+    { normalTopic: "ハンバーガー", fakeTopic: "サンドイッチ" },
+    { normalTopic: "ピザ", fakeTopic: "お好み焼き" },
+    { normalTopic: "たこ焼き", fakeTopic: "団子" },
+    { normalTopic: "焼きそば", fakeTopic: "スパゲッティ" },
+    { normalTopic: "ドーナツ", fakeTopic: "ベーグル" },
+    { normalTopic: "アイス", fakeTopic: "かき氷" },
+    { normalTopic: "チョコ", fakeTopic: "クッキー" },
+    { normalTopic: "パン", fakeTopic: "クロワッサン" },
+    { normalTopic: "目玉焼き", fakeTopic: "オムレツ" },
+    { normalTopic: "牛乳", fakeTopic: "ヨーグルト" },
+
+    { normalTopic: "自転車", fakeTopic: "バイク" },
+    { normalTopic: "船", fakeTopic: "潜水艦" },
+    { normalTopic: "ヘリコプター", fakeTopic: "ドローン" },
+    { normalTopic: "トラック", fakeTopic: "消防車" },
+    { normalTopic: "パトカー", fakeTopic: "救急車" },
+    { normalTopic: "タクシー", fakeTopic: "リムジン" },
+    { normalTopic: "ロケット", fakeTopic: "ミサイル" },
+    { normalTopic: "気球", fakeTopic: "パラシュート" },
+    { normalTopic: "スケボー", fakeTopic: "スキー" },
+    { normalTopic: "ローラースケート", fakeTopic: "スケート靴" },
+
+    { normalTopic: "鉛筆", fakeTopic: "ペン" },
+    { normalTopic: "消しゴム", fakeTopic: "石けん" },
+    { normalTopic: "はさみ", fakeTopic: "カニ" },
+    { normalTopic: "傘", fakeTopic: "きのこ" },
+    { normalTopic: "靴", fakeTopic: "スリッパ" },
+    { normalTopic: "帽子", fakeTopic: "ヘルメット" },
+    { normalTopic: "メガネ", fakeTopic: "双眼鏡" },
+    { normalTopic: "カバン", fakeTopic: "ランドセル" },
+    { normalTopic: "鍵", fakeTopic: "スプーン" },
+    { normalTopic: "マイク", fakeTopic: "懐中電灯" },
+
+    { normalTopic: "富士山", fakeTopic: "ピラミッド" },
+    { normalTopic: "海", fakeTopic: "プール" },
+    { normalTopic: "川", fakeTopic: "道路" },
+    { normalTopic: "森", fakeTopic: "公園" },
+    { normalTopic: "砂漠", fakeTopic: "ビーチ" },
+    { normalTopic: "火山", fakeTopic: "山" },
+    { normalTopic: "滝", fakeTopic: "シャワー" },
+    { normalTopic: "雲", fakeTopic: "綿あめ" },
+    { normalTopic: "雨", fakeTopic: "涙" },
+    { normalTopic: "虹", fakeTopic: "橋" },
+
+    { normalTopic: "警察官", fakeTopic: "探偵" },
+    { normalTopic: "医者", fakeTopic: "科学者" },
+    { normalTopic: "先生", fakeTopic: "店員" },
+    { normalTopic: "忍者", fakeTopic: "侍" },
+    { normalTopic: "魔法使い", fakeTopic: "魔女" },
+    { normalTopic: "宇宙飛行士", fakeTopic: "ロボット" },
+    { normalTopic: "王様", fakeTopic: "サンタ" },
+    { normalTopic: "海賊", fakeTopic: "船長" },
+    { normalTopic: "シェフ", fakeTopic: "寿司職人" },
+    { normalTopic: "アイドル", fakeTopic: "ダンサー" },
+
+    { normalTopic: "ピアノ", fakeTopic: "オルガン" },
+    { normalTopic: "ギター", fakeTopic: "バイオリン" },
+    { normalTopic: "太鼓", fakeTopic: "ドラム" },
+    { normalTopic: "笛", fakeTopic: "ラッパ" },
+    { normalTopic: "テレビ", fakeTopic: "映画館" },
+    { normalTopic: "本", fakeTopic: "ノート" },
+    { normalTopic: "ゲーム機", fakeTopic: "リモコン" },
+    { normalTopic: "カメラ", fakeTopic: "スマホ" },
+    { normalTopic: "パソコン", fakeTopic: "レジ" },
+    { normalTopic: "イヤホン", fakeTopic: "聴診器" },
+
+    { normalTopic: "ハート", fakeTopic: "桃" },
+    { normalTopic: "星", fakeTopic: "ヒトデ" },
+    { normalTopic: "丸", fakeTopic: "ボール" },
+    { normalTopic: "四角", fakeTopic: "テレビ" },
+    { normalTopic: "三角", fakeTopic: "おにぎり" },
+    { normalTopic: "リボン", fakeTopic: "蝶々" },
+    { normalTopic: "花", fakeTopic: "風車" },
+    { normalTopic: "木", fakeTopic: "ブロッコリー" },
+    { normalTopic: "葉っぱ", fakeTopic: "羽" },
+    { normalTopic: "炎", fakeTopic: "唐辛子" },
+
+    { normalTopic: "おばけ", fakeTopic: "クラゲ" },
+    { normalTopic: "ドラゴン", fakeTopic: "恐竜" },
+    { normalTopic: "ユニコーン", fakeTopic: "馬" },
+    { normalTopic: "天使", fakeTopic: "妖精" },
+    { normalTopic: "悪魔", fakeTopic: "コウモリ" },
+    { normalTopic: "ゾンビ", fakeTopic: "ミイラ" },
+    { normalTopic: "吸血鬼", fakeTopic: "魔法使い" },
+    { normalTopic: "人魚", fakeTopic: "魚" },
+    { normalTopic: "サンタ", fakeTopic: "雪だるま" },
+    { normalTopic: "鬼", fakeTopic: "レスラー" }
   ];
 
   try {
@@ -471,6 +599,151 @@ function renderLobbyPlayers(players) {
 
 
 // ==============================
+// 同期タイマー
+// ==============================
+function cancelSyncedTimer() {
+  cancelAnimationFrame(syncedTimerAnimationId);
+  syncedTimerAnimationId = null;
+}
+
+function getPhaseEndMs(room) {
+  const start = Number(room.phaseStartAtMs || Date.now());
+  const duration = Number(room.phaseDurationSec || 0) * 1000;
+  return start + duration;
+}
+
+function startSyncedCountdown(room, displayId, progressId, onEnd) {
+  cancelSyncedTimer();
+
+  const display = $(displayId);
+  const progress = $(progressId);
+
+  let ended = false;
+
+  function tick() {
+    const now = Date.now();
+    const startMs = Number(room.phaseStartAtMs || now);
+    const durationMs = Number(room.phaseDurationSec || 0) * 1000;
+    const endMs = startMs + durationMs;
+
+    const remainMs = Math.max(0, endMs - now);
+    const remainSec = Math.ceil(remainMs / 1000);
+
+    if (display) display.textContent = String(remainSec);
+
+    if (progress) {
+      const ratio = durationMs > 0
+        ? Math.max(0, Math.min(1, remainMs / durationMs))
+        : 0;
+
+      progress.style.width = `${ratio * 100}%`;
+    }
+
+    if (remainMs <= 0) {
+      if (!ended) {
+        ended = true;
+        if (typeof onEnd === "function") onEnd();
+      }
+      return;
+    }
+
+    syncedTimerAnimationId = requestAnimationFrame(tick);
+  }
+
+  tick();
+}
+
+function clearHostPhaseTimer() {
+  if (hostPhaseTimerId) {
+    clearTimeout(hostPhaseTimerId);
+    hostPhaseTimerId = null;
+  }
+}
+
+function scheduleHostPhaseAdvance(room) {
+  if (!isCurrentUserHost()) return;
+  if (!room || room.status !== "playing") return;
+
+  const phase = room.phase || "lobby";
+
+  if (
+    phase === "voting" ||
+    phase === "runoffVoting" ||
+    phase === "result" ||
+    phase === "finished" ||
+    phase === "lobby"
+  ) {
+    return;
+  }
+
+  const key = `${room.gameId || "nogame"}_${phase}_${room.phaseStartAtMs || "nostart"}_${room.voteRound || "main"}_${room.runoffRound || 0}`;
+
+  if (lastScheduledHostPhaseKey === key) return;
+  lastScheduledHostPhaseKey = key;
+
+  clearHostPhaseTimer();
+
+  const endMs = getPhaseEndMs(room);
+  const delay = Math.max(0, endMs - Date.now() + 500);
+
+  hostPhaseTimerId = setTimeout(async () => {
+    try {
+      await advancePhaseAsHost(room);
+    } catch (error) {
+      console.error("フェーズ進行失敗:", error);
+    }
+  }, delay);
+
+  console.log("ホストフェーズ進行予約:", phase, delay);
+}
+
+async function advancePhaseAsHost(room) {
+  if (!isCurrentUserHost()) return;
+  if (!currentRoomId) return;
+
+  const GameDB = requireGameDB();
+  const phase = room.phase || "lobby";
+
+  if (phase === "topic") {
+    await GameDB.updateRoomPhase(currentRoomId, "drawing1", FIRST_DRAW_SECONDS);
+    return;
+  }
+
+  if (phase === "drawing1") {
+    await GameDB.updateRoomPhase(currentRoomId, "midReview", MID_DISCUSSION_SECONDS);
+    return;
+  }
+
+  if (phase === "midReview") {
+    await GameDB.updateRoomPhase(currentRoomId, "drawing2", SECOND_DRAW_SECONDS);
+    return;
+  }
+
+  if (phase === "drawing2") {
+    await GameDB.updateRoomPhase(currentRoomId, "finalReview", FINAL_DISCUSSION_SECONDS);
+    return;
+  }
+
+  if (phase === "finalReview") {
+    await GameDB.updateRoomPhase(currentRoomId, "voting", 0, {
+      voteRound: "main"
+    });
+    return;
+  }
+
+  if (phase === "runoffDiscussion") {
+    const round = room.voteRound || `runoff_${room.runoffRound || 1}`;
+
+    await GameDB.updateRoomPhase(currentRoomId, "runoffVoting", 0, {
+      voteRound: round,
+      runoffRound: room.runoffRound || 1,
+      runoffCandidates: room.runoffCandidates || []
+    });
+  }
+}
+
+
+// ==============================
 // オンラインリスナー
 // ==============================
 function startOnlineListeners() {
@@ -488,8 +761,12 @@ function startOnlineListeners() {
     renderLobbyPlayers(currentPlayers);
     updateLobbyControlButtons();
 
-    if (!resultShown && latestVotes.length > 0) {
-      checkAllVotesAndShowResult(latestVotes);
+    if (
+      currentRoomData &&
+      (currentRoomData.phase === "voting" || currentRoomData.phase === "runoffVoting") &&
+      latestVotes.length > 0
+    ) {
+      checkAllVotesAndDecide(latestVotes);
     }
   });
 
@@ -499,36 +776,102 @@ function startOnlineListeners() {
 
     if (!room) return;
 
-    if (room.status === "lobby" && resultShown) {
-      resetLocalRoundStateForLobby();
-      showScreen("lobby-screen");
-      updateLobbyControlButtons();
+    if (room.phase === "lobby" || room.status === "lobby") {
+      if (resultShown || lastHandledPhaseKey) {
+        resetLocalRoundStateForLobby();
+        showScreen("lobby-screen");
+        updateLobbyControlButtons();
+      }
       return;
     }
 
-    if (room.status === "playing" && !onlineTopicHandled) {
-      onlineTopicHandled = true;
-
-      try {
-        const GameDB = requireGameDB();
-
-        myAssignment = await GameDB.getMyAssignment(currentRoomId);
-
-        isFakeArtist = myAssignment.role === "fake" || myAssignment.isFake === true;
-        currentTopic = myAssignment.topic || "？？？";
-
-        showTopicScreen(currentTopic);
-      } catch (error) {
-        console.error("自分のお題取得失敗:", error);
-        alert(
-          "自分のお題の取得に失敗しました。\n\n" +
-          "少し待ってから最新版に更新してください。\n\n" +
-          "code: " + (error.code || "なし") + "\n" +
-          "message: " + (error.message || error)
-        );
-      }
-    }
+    scheduleHostPhaseAdvance(room);
+    await handleRoomPhase(room);
   });
+}
+
+async function handleRoomPhase(room) {
+  const phase = room.phase || "lobby";
+  const key = `${room.gameId || "nogame"}_${phase}_${room.phaseStartAtMs || "nostart"}_${room.voteRound || "main"}_${room.runoffRound || 0}`;
+
+  if (lastHandledPhaseKey === key) return;
+  lastHandledPhaseKey = key;
+
+  console.log("phase処理:", key, room);
+
+  if (phase === "topic") {
+    await handleTopicPhase(room);
+    return;
+  }
+
+  if (phase === "drawing1") {
+    startFirstDrawingSynced(room);
+    return;
+  }
+
+  if (phase === "midReview") {
+    await saveCurrentDrawingPhaseOnce("mid");
+    showMidReviewSynced(room);
+    return;
+  }
+
+  if (phase === "drawing2") {
+    startSecondDrawingSynced(room);
+    return;
+  }
+
+  if (phase === "finalReview") {
+    await saveCurrentDrawingPhaseOnce("final");
+    showFinalReviewSynced(room);
+    return;
+  }
+
+  if (phase === "voting") {
+    showVoteScreen("main", null);
+    return;
+  }
+
+  if (phase === "runoffDiscussion") {
+    showRunoffDiscussionScreen(room);
+    return;
+  }
+
+  if (phase === "runoffVoting") {
+    showVoteScreen(room.voteRound || `runoff_${room.runoffRound || 1}`, room.runoffCandidates || []);
+    return;
+  }
+
+  if (phase === "result") {
+    showSyncedResultScreen(room.resultData || null);
+    return;
+  }
+
+  if (phase === "finished") {
+    if (!resultShown && room.resultData) {
+      showSyncedResultScreen(room.resultData);
+    }
+  }
+}
+
+async function handleTopicPhase(room) {
+  try {
+    const GameDB = requireGameDB();
+
+    myAssignment = await GameDB.getMyAssignment(currentRoomId);
+
+    isFakeArtist = myAssignment.role === "fake" || myAssignment.isFake === true;
+    currentTopic = myAssignment.topic || "？？？";
+
+    showTopicScreen(currentTopic, room);
+  } catch (error) {
+    console.error("自分のお題取得失敗:", error);
+    alert(
+      "自分のお題の取得に失敗しました。\n\n" +
+      "少し待ってから最新版に更新してください。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
+    );
+  }
 }
 
 
@@ -579,6 +922,7 @@ async function joinRoomFlow() {
 
     if (GameDB.roomExists) {
       const exists = await GameDB.roomExists(roomId);
+
       if (!exists) {
         alert("その部屋が見つかりませんでした。部屋コードを確認してください。");
         return;
@@ -633,12 +977,7 @@ async function enterRoomFlow() {
     const display = $("room-id-display");
     if (display) display.textContent = currentRoomId;
 
-    onlineTopicHandled = false;
-    hasVoted = false;
-    resultShown = false;
-    latestVotes = [];
-    myAssignment = null;
-    isFakeArtist = false;
+    resetLocalRoundStateForLobby();
 
     showScreen("lobby-screen");
     startOnlineListeners();
@@ -656,7 +995,37 @@ async function enterRoomFlow() {
 // ==============================
 // お題画面
 // ==============================
-function showTopicScreen(topic) {
+function ensurePhaseSyncBox(screenSelector, insertAfterElement) {
+  let box = $("phase-sync-box");
+
+  if (box) {
+    box.remove();
+  }
+
+  box = document.createElement("div");
+  box.id = "phase-sync-box";
+  box.className = "phase-sync-box";
+
+  box.innerHTML = `
+    <div class="phase-sync-label">同期タイマー</div>
+    <div class="phase-sync-time"><span id="phase-sync-time">0</span>秒</div>
+    <div class="phase-sync-bar">
+      <div id="phase-sync-progress" class="phase-sync-progress"></div>
+    </div>
+  `;
+
+  if (insertAfterElement) {
+    insertAfterElement.insertAdjacentElement("afterend", box);
+    return box;
+  }
+
+  const parent = document.querySelector(screenSelector);
+  if (parent) parent.appendChild(box);
+
+  return box;
+}
+
+function showTopicScreen(topic, room) {
   currentTopic = topic;
 
   const display = $("topic-display");
@@ -702,7 +1071,13 @@ function showTopicScreen(topic) {
     badge.textContent = "お題：" + topicToText(topic);
   }
 
+  ensurePhaseSyncBox("#topic-screen", roleBox || display);
+
   showScreen("topic-screen");
+
+  if (room) {
+    startSyncedCountdown(room, "phase-sync-time", "phase-sync-progress");
+  }
 }
 
 
@@ -777,6 +1152,7 @@ function getCanvasPoint(event) {
 
 function startDrawing(event) {
   if (!canvas || !ctx) return;
+  if (phaseEnding) return;
 
   event.preventDefault();
   isDrawing = true;
@@ -800,6 +1176,7 @@ function startDrawing(event) {
 
 function moveDrawing(event) {
   if (!isDrawing || !currentStroke || !canvas || !ctx) return;
+  if (phaseEnding) return;
 
   event.preventDefault();
 
@@ -862,6 +1239,7 @@ function setupDrawingTools() {
   const undoBtn = $("undo-btn");
   if (undoBtn) {
     undoBtn.addEventListener("click", () => {
+      if (phaseEnding) return;
       strokes.pop();
       redrawCanvas();
     });
@@ -870,6 +1248,7 @@ function setupDrawingTools() {
   const clearBtn = $("clear-canvas-btn");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
+      if (phaseEnding) return;
       if (!confirm("絵を消しますか？")) return;
       strokes = [];
       redrawCanvas();
@@ -899,12 +1278,15 @@ function getCanvasImage() {
 
 
 // ==============================
-// 描画フェーズ
+// 描画フェーズ v620 同期
 // ==============================
-function startFirstDrawing() {
+function startFirstDrawingSynced(room) {
   drawingPhase = 1;
   phaseEnding = false;
+  savedDrawingPhaseMap.mid = false;
+
   strokes = [];
+  currentStroke = null;
 
   initCanvas();
 
@@ -915,21 +1297,28 @@ function startFirstDrawing() {
   if (title) title.textContent = "まずは15秒で描こう";
 
   const help = $("drawing-help");
-  if (help) help.textContent = "15秒で一度見せ合います。描きすぎ注意！";
+  if (help) help.textContent = "全員同時にタイマーが進みます。描きすぎ注意！";
 
   const topicBadge = $("drawing-topic-badge");
   if (topicBadge) topicBadge.textContent = "お題：" + topicToText(currentTopic);
 
   const finishBtn = $("finish-drawing-btn");
-  if (finishBtn) finishBtn.textContent = "この段階を完了";
+  if (finishBtn) {
+    finishBtn.disabled = false;
+    finishBtn.textContent = "ここまで保存";
+  }
 
   showScreen("drawing-screen");
-  startDrawingTimer(FIRST_DRAW_SECONDS);
+
+  startSyncedCountdown(room, "timer-display", "timer-progress", async () => {
+    await saveCurrentDrawingPhaseOnce("mid");
+  });
 }
 
-function startSecondDrawing() {
+function startSecondDrawingSynced(room) {
   drawingPhase = 2;
   phaseEnding = false;
+  savedDrawingPhaseMap.final = false;
 
   const phaseLabel = $("drawing-phase-label");
   if (phaseLabel) phaseLabel.textContent = "後半お絵描き";
@@ -944,67 +1333,45 @@ function startSecondDrawing() {
   if (topicBadge) topicBadge.textContent = "お題：" + topicToText(currentTopic);
 
   const finishBtn = $("finish-drawing-btn");
-  if (finishBtn) finishBtn.textContent = "完成";
-
-  showScreen("drawing-screen");
-  startDrawingTimer(SECOND_DRAW_SECONDS);
-}
-
-function startDrawingTimer(seconds) {
-  cancelAnimationFrame(timerAnimationId);
-
-  phaseStartTime = performance.now();
-  phaseDurationMs = seconds * 1000;
-
-  const display = $("timer-display");
-  const progress = $("timer-progress");
-
-  function tick(now) {
-    const elapsed = now - phaseStartTime;
-    const remainMs = Math.max(0, phaseDurationMs - elapsed);
-    const remainSec = Math.ceil(remainMs / 1000);
-
-    if (display) display.textContent = String(remainSec);
-
-    if (progress) {
-      const ratio = Math.max(0, Math.min(1, remainMs / phaseDurationMs));
-      progress.style.width = `${ratio * 100}%`;
-    }
-
-    if (remainMs <= 0) {
-      forceFinishCurrentDrawingPhase();
-      return;
-    }
-
-    timerAnimationId = requestAnimationFrame(tick);
+  if (finishBtn) {
+    finishBtn.disabled = false;
+    finishBtn.textContent = "完成を保存";
   }
 
-  timerAnimationId = requestAnimationFrame(tick);
+  showScreen("drawing-screen");
+
+  startSyncedCountdown(room, "timer-display", "timer-progress", async () => {
+    await saveCurrentDrawingPhaseOnce("final");
+  });
 }
 
-async function forceFinishCurrentDrawingPhase() {
-  if (phaseEnding) return;
+async function saveCurrentDrawingPhaseOnce(phase) {
+  try {
+    if (phase === "mid" && savedDrawingPhaseMap.mid) return;
+    if (phase === "final" && savedDrawingPhaseMap.final) return;
 
-  phaseEnding = true;
-  cancelAnimationFrame(timerAnimationId);
+    phaseEnding = true;
+    isDrawing = false;
 
-  const overlay = $("timeup-overlay");
-  if (overlay) overlay.classList.add("active");
+    const finishBtn = $("finish-drawing-btn");
+    if (finishBtn) {
+      finishBtn.disabled = true;
+      finishBtn.textContent = "保存済み";
+    }
 
-  await new Promise((resolve) => setTimeout(resolve, 600));
+    const image = getCanvasImage();
 
-  if (overlay) overlay.classList.remove("active");
+    if (phase === "mid") {
+      midImageDataUrl = image;
+      savedDrawingPhaseMap.mid = true;
+    } else {
+      finalImageDataUrl = image;
+      savedDrawingPhaseMap.final = true;
+    }
 
-  const image = getCanvasImage();
-
-  if (drawingPhase === 1) {
-    midImageDataUrl = image;
-    await saveDrawingOnline("mid", midImageDataUrl);
-    showMidReview();
-  } else {
-    finalImageDataUrl = image;
-    await saveDrawingOnline("final", finalImageDataUrl);
-    showFinalReview();
+    await saveDrawingOnline(phase, image);
+  } catch (error) {
+    console.error("描画保存失敗:", error);
   }
 }
 
@@ -1097,6 +1464,7 @@ function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
     } catch (error) {
       console.warn("前のギャラリーリスナー停止失敗:", error);
     }
+
     reviewGalleryUnsubscribe = null;
   }
 
@@ -1120,9 +1488,9 @@ function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
 
 
 // ==============================
-// 公開・討論
+// 公開・討論 v620 同期
 // ==============================
-function showMidReview() {
+function showMidReviewSynced(room) {
   const phaseLabel = $("review-phase-label");
   if (phaseLabel) phaseLabel.textContent = "途中公開";
 
@@ -1130,7 +1498,7 @@ function showMidReview() {
   if (title) title.textContent = "途中経過を見せ合おう";
 
   const description = $("review-description");
-  if (description) description.textContent = "軽く話し合って、怪しい人を探しましょう。";
+  if (description) description.textContent = "全員同時に1分の途中討論です。";
 
   const timerLabel = $("review-timer-label");
   if (timerLabel) timerLabel.textContent = "途中討論";
@@ -1150,12 +1518,10 @@ function showMidReview() {
   showScreen("review-screen");
   startDrawingGalleryListener("mid", "途中絵", midImageDataUrl);
 
-  startReviewTimer(MID_DISCUSSION_SECONDS, () => {
-    startSecondDrawing();
-  });
+  startSyncedCountdown(room, "review-timer-display", "review-progress");
 }
 
-function showFinalReview() {
+function showFinalReviewSynced(room) {
   const phaseLabel = $("review-phase-label");
   if (phaseLabel) phaseLabel.textContent = "最終公開";
 
@@ -1163,7 +1529,7 @@ function showFinalReview() {
   if (title) title.textContent = "完成した絵を見せ合おう";
 
   const description = $("review-description");
-  if (description) description.textContent = "最後の話し合いです。ニセ絵師を探しましょう。";
+  if (description) description.textContent = "全員同時に最後の話し合いです。ニセ絵師を探しましょう。";
 
   const timerLabel = $("review-timer-label");
   if (timerLabel) timerLabel.textContent = "最終討論";
@@ -1183,46 +1549,51 @@ function showFinalReview() {
   showScreen("review-screen");
   startDrawingGalleryListener("final", "完成絵", finalImageDataUrl);
 
-  startReviewTimer(FINAL_DISCUSSION_SECONDS, () => {
-    showVoteScreen();
-  });
+  startSyncedCountdown(room, "review-timer-display", "review-progress");
 }
 
-function startReviewTimer(seconds, onFinish) {
-  cancelAnimationFrame(reviewTimerAnimationId);
+function showRunoffDiscussionScreen(room) {
+  const candidates = Array.isArray(room.runoffCandidates) ? room.runoffCandidates : [];
 
-  reviewStartTime = performance.now();
-  reviewDurationMs = seconds * 1000;
+  const phaseLabel = $("review-phase-label");
+  if (phaseLabel) phaseLabel.textContent = "同票再議論";
 
-  const display = $("review-timer-display");
-  const progress = $("review-progress");
+  const title = $("review-title");
+  if (title) title.textContent = "同票です。1分間、再議論しましょう";
 
-  function tick(now) {
-    const elapsed = now - reviewStartTime;
-    const remainMs = Math.max(0, reviewDurationMs - elapsed);
-    const remainSec = Math.ceil(remainMs / 1000);
-
-    if (display) display.textContent = String(remainSec);
-
-    if (progress) {
-      const ratio = Math.max(0, Math.min(1, remainMs / reviewDurationMs));
-      progress.style.width = `${ratio * 100}%`;
-    }
-
-    if (remainMs <= 0) {
-      if (typeof onFinish === "function") onFinish();
-      return;
-    }
-
-    reviewTimerAnimationId = requestAnimationFrame(tick);
+  const description = $("review-description");
+  if (description) {
+    description.innerHTML = `
+      最も票が多かった人が複数います。<br>
+      この候補者について話し合ってから再投票します。<br>
+      <strong>候補：</strong>${candidates.map((p) => escapeHtml(p.name || "名無し")).join("、")}
+    `;
   }
 
-  reviewTimerAnimationId = requestAnimationFrame(tick);
+  const timerLabel = $("review-timer-label");
+  if (timerLabel) timerLabel.textContent = "再議論";
+
+  const image = $("review-image");
+  if (image) image.src = finalImageDataUrl || midImageDataUrl || "";
+
+  const name = $("gallery-player-name");
+  if (name) name.textContent = "同票候補を話し合おう";
+
+  const nextBtn = $("review-next-btn");
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.textContent = "自動で再投票へ";
+  }
+
+  showScreen("review-screen");
+  startDrawingGalleryListener("final", "完成絵", finalImageDataUrl);
+
+  startSyncedCountdown(room, "review-timer-display", "review-progress");
 }
 
 
 // ==============================
-// 投票・結果同期 v619
+// 投票・結果同期 v620
 // ==============================
 function getValidVotingPlayers() {
   if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
@@ -1230,6 +1601,19 @@ function getValidVotingPlayers() {
   }
 
   return [];
+}
+
+function getVoteCandidates(candidates) {
+  if (Array.isArray(candidates) && candidates.length > 0) {
+    return candidates
+      .map((candidate) => {
+        const player = getPlayerByUid(candidate.uid);
+        return player || candidate;
+      })
+      .filter((candidate) => candidate && candidate.uid);
+  }
+
+  return getValidVotingPlayers();
 }
 
 function getMyVote(votes) {
@@ -1268,7 +1652,7 @@ function renderVoteWaiting(votes) {
   } else {
     status.innerHTML = `
       <strong>投票してください</strong>
-      <p>全員の投票が終わると、自動で結果画面に進みます。</p>
+      <p>全員の投票が終わると、自動で次へ進みます。</p>
       <p>現在の投票数：${voteCount} / ${playerCount}</p>
     `;
   }
@@ -1288,7 +1672,7 @@ function updateVoteButtonsDisabled() {
   });
 }
 
-function startVoteListener() {
+function startVoteListener(voteRound) {
   if (voteUnsubscribe) {
     try {
       voteUnsubscribe();
@@ -1302,23 +1686,177 @@ function startVoteListener() {
   if (!currentRoomId) return;
   if (!window.GameDB || !window.GameDB.listenVotes) return;
 
+  const round = voteRound || "main";
+
   try {
-    voteUnsubscribe = window.GameDB.listenVotes(currentRoomId, (votes) => {
+    voteUnsubscribe = window.GameDB.listenVotes(currentRoomId, round, (votes) => {
       latestVotes = votes || [];
 
       const myVote = getMyVote(latestVotes);
       hasVoted = !!myVote;
 
       renderVoteWaiting(latestVotes);
-      checkAllVotesAndShowResult(latestVotes);
+      checkAllVotesAndDecide(latestVotes);
     });
   } catch (error) {
     console.error("投票リスナー開始失敗:", error);
   }
 }
 
-function checkAllVotesAndShowResult(votes) {
-  if (resultShown) return;
+function showVoteScreen(voteRound, candidates) {
+  currentVoteRound = voteRound || "main";
+  hasVoted = false;
+  resultShown = false;
+  latestVotes = [];
+
+  const voteList = $("vote-list");
+  if (!voteList) return;
+
+  voteList.innerHTML = "";
+
+  const oldStatus = $("vote-status-box");
+  if (oldStatus) oldStatus.remove();
+
+  const title = document.querySelector("#vote-screen h2, #vote-screen .screen-title");
+  if (title) {
+    title.textContent = currentVoteRound === "main"
+      ? "ニセ絵師だと思う人に投票"
+      : "同票候補から再投票";
+  }
+
+  const voteCandidates = getVoteCandidates(candidates);
+
+  if (voteCandidates.length <= 0) {
+    voteList.innerHTML = `
+      <p class="note">
+        投票できる参加者情報がまだ読み込まれていません。少し待ってください。
+      </p>
+    `;
+
+    showScreen("vote-screen");
+    startVoteListener(currentVoteRound);
+    return;
+  }
+
+  const myUid = getMyUidSafe();
+
+  voteCandidates.forEach((player) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary-btn vote-btn";
+
+    const isMe = player.uid === myUid;
+
+    button.textContent = isMe
+      ? `${player.name || "名無し"}（自分）`
+      : player.name || "名無し";
+
+    button.addEventListener("click", async () => {
+      await handleVote(player);
+    });
+
+    voteList.appendChild(button);
+  });
+
+  showScreen("vote-screen");
+  startVoteListener(currentVoteRound);
+  renderVoteWaiting(latestVotes);
+}
+
+async function handleVote(votedPlayer) {
+  try {
+    if (!currentRoomId) {
+      alert("部屋情報がありません。");
+      return;
+    }
+
+    if (!votedPlayer || !votedPlayer.uid) {
+      alert("投票先が不正です。");
+      return;
+    }
+
+    if (hasVoted) {
+      alert("すでに投票済みです。");
+      return;
+    }
+
+    const GameDB = requireGameDB();
+
+    await GameDB.saveVote(currentRoomId, votedPlayer, currentVoteRound);
+
+    hasVoted = true;
+    updateVoteButtonsDisabled();
+    renderVoteWaiting(latestVotes);
+  } catch (error) {
+    console.error("投票失敗:", error);
+    alert(
+      "投票に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
+    );
+  }
+}
+
+function buildVoteResult(votes, candidateList) {
+  const basePlayers = Array.isArray(candidateList) && candidateList.length > 0
+    ? candidateList
+    : getValidVotingPlayers();
+
+  const resultMap = {};
+
+  basePlayers.forEach((player) => {
+    resultMap[player.uid] = {
+      uid: player.uid,
+      name: player.name || "名無し",
+      count: 0,
+      voters: []
+    };
+  });
+
+  votes.forEach((vote) => {
+    const votedUid = vote.votedUid;
+
+    if (!resultMap[votedUid]) {
+      resultMap[votedUid] = {
+        uid: votedUid,
+        name: vote.votedName || "名無し",
+        count: 0,
+        voters: []
+      };
+    }
+
+    resultMap[votedUid].count += 1;
+    resultMap[votedUid].voters.push(vote.name || "名無し");
+  });
+
+  const results = Object.values(resultMap);
+
+  results.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.name.localeCompare(b.name, "ja");
+  });
+
+  const maxCount = results.length > 0 ? results[0].count : 0;
+  const topPlayers = results.filter((result) => result.count === maxCount && maxCount > 0);
+
+  return { results, topPlayers, maxCount };
+}
+
+function getCurrentRoundCandidates() {
+  if (
+    currentRoomData &&
+    currentRoomData.phase === "runoffVoting" &&
+    Array.isArray(currentRoomData.runoffCandidates)
+  ) {
+    return currentRoomData.runoffCandidates;
+  }
+
+  return null;
+}
+
+function checkAllVotesAndDecide(votes) {
+  if (!currentRoomData) return;
+  if (!(currentRoomData.phase === "voting" || currentRoomData.phase === "runoffVoting")) return;
 
   const players = getValidVotingPlayers();
   const voteList = Array.isArray(votes) ? votes : [];
@@ -1327,11 +1865,62 @@ function checkAllVotesAndShowResult(votes) {
 
   const votedUidSet = new Set(voteList.map((vote) => vote.uid));
   const allPlayerUids = players.map((player) => player.uid);
-
   const allVoted = allPlayerUids.every((uid) => votedUidSet.has(uid));
 
-  if (allVoted && voteList.length >= players.length) {
-    showSyncedResultScreen(voteList);
+  if (!allVoted || voteList.length < players.length) return;
+
+  if (!isCurrentUserHost()) return;
+
+  const round = currentRoomData.voteRound || currentVoteRound || "main";
+
+  if (processedVoteRounds.has(round)) return;
+  processedVoteRounds.add(round);
+
+  decideOutcomeAsHost(voteList, round);
+}
+
+async function decideOutcomeAsHost(votes, round) {
+  try {
+    const GameDB = requireGameDB();
+
+    const candidates = getCurrentRoundCandidates();
+    const voteResult = buildVoteResult(votes || [], candidates);
+
+    const topPlayers = voteResult.topPlayers;
+
+    if (topPlayers.length > 1) {
+      const currentRunoffRound = Number(currentRoomData.runoffRound || 0);
+      const nextRunoffRound = currentRunoffRound + 1;
+
+      const runoffCandidates = topPlayers.map((player) => ({
+        uid: player.uid,
+        name: player.name || "名無し",
+        count: player.count || 0
+      }));
+
+      await GameDB.setRunoff(currentRoomId, runoffCandidates, nextRunoffRound);
+      return;
+    }
+
+    const answer = currentRoomData && currentRoomData.answer ? currentRoomData.answer : null;
+    const fakeUid = answer ? answer.fakeUid : null;
+
+    const votedFake = topPlayers.some((player) => player.uid === fakeUid);
+    const winner = votedFake ? "citizen" : "fake";
+
+    const resultData = {
+      voteRound: round,
+      results: voteResult.results,
+      topPlayers: voteResult.topPlayers,
+      maxCount: voteResult.maxCount,
+      answer: answer,
+      winner: winner,
+      createdAtMs: Date.now()
+    };
+
+    await GameDB.setResult(currentRoomId, resultData);
+  } catch (error) {
+    console.error("結果判定失敗:", error);
   }
 }
 
@@ -1401,137 +1990,13 @@ async function finishRoomIfHost() {
   }
 }
 
-function showVoteScreen() {
-  hasVoted = false;
-  resultShown = false;
-
-  const voteList = $("vote-list");
-  if (!voteList) return;
-
-  voteList.innerHTML = "";
-
-  const oldStatus = $("vote-status-box");
-  if (oldStatus) oldStatus.remove();
-
-  const players = getValidVotingPlayers();
-
-  if (players.length <= 0) {
-    voteList.innerHTML = `
-      <p class="note">
-        投票できる参加者情報がまだ読み込まれていません。少し待ってください。
-      </p>
-    `;
-
-    showScreen("vote-screen");
-    startVoteListener();
-    return;
-  }
-
-  const myUid = getMyUidSafe();
-
-  players.forEach((player) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "secondary-btn vote-btn";
-
-    const isMe = player.uid === myUid;
-
-    button.textContent = isMe
-      ? `${player.name || "名無し"}（自分）`
-      : player.name || "名無し";
-
-    button.addEventListener("click", async () => {
-      await handleVote(player);
-    });
-
-    voteList.appendChild(button);
-  });
-
-  showScreen("vote-screen");
-  startVoteListener();
-  renderVoteWaiting(latestVotes);
-}
-
-async function handleVote(votedPlayer) {
-  try {
-    if (!currentRoomId) {
-      alert("部屋情報がありません。");
-      return;
-    }
-
-    if (!votedPlayer || !votedPlayer.uid) {
-      alert("投票先が不正です。");
-      return;
-    }
-
-    if (hasVoted) {
-      alert("すでに投票済みです。");
-      return;
-    }
-
-    const GameDB = requireGameDB();
-
-    await GameDB.saveVote(currentRoomId, votedPlayer);
-
-    hasVoted = true;
-    updateVoteButtonsDisabled();
-    renderVoteWaiting(latestVotes);
-  } catch (error) {
-    console.error("投票失敗:", error);
-    alert(
-      "投票に失敗しました。\n\n" +
-      "code: " + (error.code || "なし") + "\n" +
-      "message: " + (error.message || error)
-    );
-  }
-}
-
-function buildVoteResult(votes) {
-  const players = getValidVotingPlayers();
-  const resultMap = {};
-
-  players.forEach((player) => {
-    resultMap[player.uid] = {
-      uid: player.uid,
-      name: player.name || "名無し",
-      count: 0,
-      voters: []
-    };
-  });
-
-  votes.forEach((vote) => {
-    const votedUid = vote.votedUid;
-
-    if (!resultMap[votedUid]) {
-      resultMap[votedUid] = {
-        uid: votedUid,
-        name: vote.votedName || "名無し",
-        count: 0,
-        voters: []
-      };
-    }
-
-    resultMap[votedUid].count += 1;
-    resultMap[votedUid].voters.push(vote.name || "名無し");
-  });
-
-  const results = Object.values(resultMap);
-
-  results.sort((a, b) => {
-    if (b.count !== a.count) return b.count - a.count;
-    return a.name.localeCompare(b.name, "ja");
-  });
-
-  const maxCount = results.length > 0 ? results[0].count : 0;
-  const topPlayers = results.filter((result) => result.count === maxCount && maxCount > 0);
-
-  return { results, topPlayers, maxCount };
-}
-
-function showSyncedResultScreen(votes) {
+function showSyncedResultScreen(resultData) {
   if (resultShown) return;
 
   resultShown = true;
+
+  cancelSyncedTimer();
+  clearHostPhaseTimer();
 
   if (voteUnsubscribe) {
     try {
@@ -1544,43 +2009,64 @@ function showSyncedResultScreen(votes) {
   }
 
   const resultDisplay = $("result-display");
-  const voteResult = buildVoteResult(votes || []);
 
-  const results = voteResult.results;
-  const topPlayers = voteResult.topPlayers;
+  const data = resultData || {};
+  const results = Array.isArray(data.results) ? data.results : [];
+  const topPlayers = Array.isArray(data.topPlayers) ? data.topPlayers : [];
+  const answer = data.answer || (currentRoomData && currentRoomData.answer ? currentRoomData.answer : null);
+  const winner = data.winner || "unknown";
 
   let topText = "";
 
   if (topPlayers.length === 0) {
     topText = "投票結果を集計できませんでした。";
   } else if (topPlayers.length === 1) {
-    topText = `一番疑われた人：${escapeHtml(topPlayers[0].name)}`;
+    topText = `一番疑われた人：${escapeHtml(topPlayers[0].name || "名無し")}`;
   } else {
-    topText = `同票：${topPlayers.map((player) => escapeHtml(player.name)).join("、")}`;
+    topText = `同票：${topPlayers.map((player) => escapeHtml(player.name || "名無し")).join("、")}`;
   }
 
-  const answer = currentRoomData && currentRoomData.answer ? currentRoomData.answer : null;
   let answerHtml = "";
 
   if (answer) {
-    const votedFake = topPlayers.some((player) => player.uid === answer.fakeUid);
+    const fakeName = escapeHtml(answer.fakeName || "名無し");
+    const normalTopic = escapeHtml(answer.normalTopic || "？？？");
+    const fakeTopic = escapeHtml(answer.fakeTopic || "？？？");
 
-    if (votedFake) {
+    if (winner === "citizen") {
       answerHtml = `
         <div class="answer-box citizen-win">
           <h3>市民絵師チームの勝利！</h3>
-          <p>ニセ絵師は ${escapeHtml(answer.fakeName || "名無し")} でした。</p>
-          <p>通常お題：${escapeHtml(answer.normalTopic || "？？？")}</p>
-          <p>ニセ絵師のお題：${escapeHtml(answer.fakeTopic || "？？？")}</p>
+          <div class="fake-artist-reveal">
+            <span class="fake-artist-label">ニセ絵師</span>
+            <strong>${fakeName}</strong>
+          </div>
+          <p>通常お題：${normalTopic}</p>
+          <p>ニセ絵師のお題：${fakeTopic}</p>
+        </div>
+      `;
+    } else if (winner === "fake") {
+      answerHtml = `
+        <div class="answer-box fake-win">
+          <h3>ニセ絵師の勝利！</h3>
+          <div class="fake-artist-reveal">
+            <span class="fake-artist-label">ニセ絵師</span>
+            <strong>${fakeName}</strong>
+          </div>
+          <p>通常お題：${normalTopic}</p>
+          <p>ニセ絵師のお題：${fakeTopic}</p>
         </div>
       `;
     } else {
       answerHtml = `
-        <div class="answer-box fake-win">
-          <h3>ニセ絵師の勝利！</h3>
-          <p>ニセ絵師は ${escapeHtml(answer.fakeName || "名無し")} でした。</p>
-          <p>通常お題：${escapeHtml(answer.normalTopic || "？？？")}</p>
-          <p>ニセ絵師のお題：${escapeHtml(answer.fakeTopic || "？？？")}</p>
+        <div class="answer-box">
+          <h3>正解発表</h3>
+          <div class="fake-artist-reveal">
+            <span class="fake-artist-label">ニセ絵師</span>
+            <strong>${fakeName}</strong>
+          </div>
+          <p>通常お題：${normalTopic}</p>
+          <p>ニセ絵師のお題：${fakeTopic}</p>
         </div>
       `;
     }
@@ -1598,15 +2084,20 @@ function showSyncedResultScreen(votes) {
   `;
 
   results.forEach((result) => {
-    const votersText = result.voters.length > 0
+    const isFake = answer && result.uid === answer.fakeUid;
+
+    const votersText = result.voters && result.voters.length > 0
       ? result.voters.map((name) => escapeHtml(name)).join("、")
       : "なし";
 
     resultHtml += `
-      <div class="vote-result-item">
+      <div class="vote-result-item ${isFake ? "fake-result-highlight" : ""}">
         <div class="vote-result-main">
-          <strong>${escapeHtml(result.name)}</strong>
-          <span>${result.count}票</span>
+          <strong>
+            ${escapeHtml(result.name || "名無し")}
+            ${isFake ? '<span class="fake-badge-inline">ニセ絵師</span>' : ""}
+          </strong>
+          <span>${result.count || 0}票</span>
         </div>
         <p>投票した人：${votersText}</p>
       </div>
@@ -1632,6 +2123,9 @@ function showSyncedResultScreen(votes) {
 // ロビー復帰用リセット
 // ==============================
 function resetLocalRoundStateForLobby() {
+  cancelSyncedTimer();
+  clearHostPhaseTimer();
+
   cancelAnimationFrame(timerAnimationId);
   cancelAnimationFrame(reviewTimerAnimationId);
 
@@ -1659,7 +2153,6 @@ function resetLocalRoundStateForLobby() {
   myAssignment = null;
   isFakeArtist = false;
 
-  onlineTopicHandled = false;
   drawingPhase = 1;
   phaseEnding = false;
 
@@ -1670,8 +2163,19 @@ function resetLocalRoundStateForLobby() {
   resultShown = false;
   latestVotes = [];
 
+  lastHandledPhaseKey = null;
+  lastScheduledHostPhaseKey = null;
+  currentVoteRound = "main";
+  processedVoteRounds = new Set();
+
+  savedDrawingPhaseMap = {
+    mid: false,
+    final: false
+  };
+
   strokes = [];
   currentStroke = null;
+  isDrawing = false;
 
   const voteList = $("vote-list");
   if (voteList) voteList.innerHTML = "";
@@ -1687,6 +2191,12 @@ function resetLocalRoundStateForLobby() {
 
   const roleBox = $("role-display-box");
   if (roleBox) roleBox.remove();
+
+  const syncBox = $("phase-sync-box");
+  if (syncBox) syncBox.remove();
+
+  const reviewGrid = $("review-gallery-grid");
+  if (reviewGrid) reviewGrid.remove();
 }
 
 
@@ -1710,13 +2220,13 @@ function backToTop() {
   currentPlayers = [];
   currentRoomData = null;
   pendingAction = null;
-  onlineTopicHandled = false;
 
   drawingPhase = 1;
   phaseEnding = false;
 
   strokes = [];
   currentStroke = null;
+  isDrawing = false;
 
   hasVoted = false;
   resultShown = false;
@@ -1754,14 +2264,18 @@ function setupEvents() {
   const goDrawingBtn = $("go-drawing-btn");
   if (goDrawingBtn) {
     goDrawingBtn.addEventListener("click", () => {
-      startFirstDrawing();
+      alert("全員同時に始まるので、自動で開始するまで待ってください。");
     });
   }
 
   const finishDrawingBtn = $("finish-drawing-btn");
   if (finishDrawingBtn) {
-    finishDrawingBtn.addEventListener("click", () => {
-      forceFinishCurrentDrawingPhase();
+    finishDrawingBtn.addEventListener("click", async () => {
+      if (drawingPhase === 1) {
+        await saveCurrentDrawingPhaseOnce("mid");
+      } else {
+        await saveCurrentDrawingPhaseOnce("final");
+      }
     });
   }
 
@@ -1838,12 +2352,7 @@ function setupEvents() {
           return;
         }
 
-        hasVoted = false;
-        resultShown = false;
-        latestVotes = [];
-        myAssignment = null;
-        isFakeArtist = false;
-        onlineTopicHandled = false;
+        resetLocalRoundStateForLobby();
 
         await GameDB.startOnlineGame(currentRoomId, {
           normalTopic: topicPair.normalTopic,
@@ -1884,7 +2393,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v619 initialized");
+  console.log("app.js v620 initialized");
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
