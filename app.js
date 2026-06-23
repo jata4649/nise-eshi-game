@@ -186,9 +186,11 @@ function requireGameDB() {
 function createRoomId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let result = "";
+
   for (let i = 0; i < 5; i++) {
     result += chars[Math.floor(Math.random() * chars.length)];
   }
+
   return result;
 }
 
@@ -272,7 +274,6 @@ function getTopicTextFromAny(topic) {
       }
     }
 
-    // どうしても取れない場合、最初の値を使う
     const values = Object.values(topic);
     for (const value of values) {
       const text = getTopicTextFromAny(value);
@@ -330,7 +331,6 @@ function pickTopicPair() {
   try {
     const topics = getTopicsArray();
 
-    // topics.js にペア形式がある場合はそれを優先
     if (topics.length > 0) {
       const pairCandidates = topics
         .map((raw) => {
@@ -382,23 +382,7 @@ function pickTopicPair() {
     console.error("topics.jsのお題ペア取得失敗:", error);
   }
 
-  // ペア形式がない場合は自然なお題ペアを使う
   return DEFAULT_TOPIC_PAIRS[Math.floor(Math.random() * DEFAULT_TOPIC_PAIRS.length)];
-}
-
-
-
-
-function getTopicsArray() {
-  if (Array.isArray(window.TOPICS) && window.TOPICS.length > 0) {
-    return window.TOPICS;
-  }
-
-  if (typeof TOPICS !== "undefined" && Array.isArray(TOPICS) && TOPICS.length > 0) {
-    return TOPICS;
-  }
-
-  return [];
 }
 
 function pickFakePlayer(players) {
@@ -515,14 +499,12 @@ function startOnlineListeners() {
 
     if (!room) return;
 
-    // v619: ホストが「もう一度遊ぶ」を押して lobby に戻したら全員ロビーへ戻る
     if (room.status === "lobby" && resultShown) {
       resetLocalRoundStateForLobby();
       showScreen("lobby-screen");
       updateLobbyControlButtons();
       return;
     }
-
 
     if (room.status === "playing" && !onlineTopicHandled) {
       onlineTopicHandled = true;
@@ -1246,12 +1228,14 @@ function getValidVotingPlayers() {
   if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
     return currentPlayers.filter((player) => player && player.uid);
   }
+
   return [];
 }
 
 function getMyVote(votes) {
   const myUid = getMyUidSafe();
   if (!myUid) return null;
+
   return (votes || []).find((vote) => vote.uid === myUid) || null;
 }
 
@@ -1295,8 +1279,12 @@ function renderVoteWaiting(votes) {
 function updateVoteButtonsDisabled() {
   document.querySelectorAll(".vote-btn").forEach((button) => {
     button.disabled = hasVoted || resultShown;
-    if (hasVoted) button.classList.add("vote-disabled");
-    else button.classList.remove("vote-disabled");
+
+    if (hasVoted) {
+      button.classList.add("vote-disabled");
+    } else {
+      button.classList.remove("vote-disabled");
+    }
   });
 }
 
@@ -1307,6 +1295,7 @@ function startVoteListener() {
     } catch (error) {
       console.warn("投票リスナー停止失敗:", error);
     }
+
     voteUnsubscribe = null;
   }
 
@@ -1395,6 +1384,22 @@ function addReplayButtonIfHost() {
   }
 }
 
+async function finishRoomIfHost() {
+  try {
+    if (!currentRoomId) return;
+    if (!isCurrentUserHost()) return;
+    if (!window.GameDB || !window.GameDB.finishRoom) return;
+
+    if (currentRoomData && currentRoomData.status === "finished") {
+      return;
+    }
+
+    await window.GameDB.finishRoom(currentRoomId);
+    console.log("部屋をfinishedにしました");
+  } catch (error) {
+    console.error("finishRoom失敗:", error);
+  }
+}
 
 function showVoteScreen() {
   hasVoted = false;
@@ -1534,6 +1539,7 @@ function showSyncedResultScreen(votes) {
     } catch (error) {
       console.warn("投票リスナー停止失敗:", error);
     }
+
     voteUnsubscribe = null;
   }
 
@@ -1616,9 +1622,15 @@ function showSyncedResultScreen(votes) {
   }
 
   showScreen("result-screen");
+
+  addReplayButtonIfHost();
+  finishRoomIfHost();
 }
 
 
+// ==============================
+// ロビー復帰用リセット
+// ==============================
 function resetLocalRoundStateForLobby() {
   cancelAnimationFrame(timerAnimationId);
   cancelAnimationFrame(reviewTimerAnimationId);
@@ -1629,6 +1641,7 @@ function resetLocalRoundStateForLobby() {
     } catch (error) {
       console.warn(error);
     }
+
     reviewGalleryUnsubscribe = null;
   }
 
@@ -1638,6 +1651,7 @@ function resetLocalRoundStateForLobby() {
     } catch (error) {
       console.warn(error);
     }
+
     voteUnsubscribe = null;
   }
 
@@ -1680,26 +1694,7 @@ function resetLocalRoundStateForLobby() {
 // トップへ戻る
 // ==============================
 function backToTop() {
-  cancelAnimationFrame(timerAnimationId);
-  cancelAnimationFrame(reviewTimerAnimationId);
-
-  if (reviewGalleryUnsubscribe) {
-    try {
-      reviewGalleryUnsubscribe();
-    } catch (error) {
-      console.warn(error);
-    }
-    reviewGalleryUnsubscribe = null;
-  }
-
-  if (voteUnsubscribe) {
-    try {
-      voteUnsubscribe();
-    } catch (error) {
-      console.warn(error);
-    }
-    voteUnsubscribe = null;
-  }
+  resetLocalRoundStateForLobby();
 
   if (window.GameDB && window.GameDB.stopListeners) {
     window.GameDB.stopListeners();
