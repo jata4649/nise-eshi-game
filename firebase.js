@@ -1,4 +1,4 @@
-console.log("firebase.js version 617 loaded");
+console.log("firebase.js version 618 loaded");
 
 // ==============================
 // Firebase 設定
@@ -308,7 +308,7 @@ function listenRoom(roomId, callback) {
 
 
 // ==============================
-// 自分のお題・役割を取得 v617
+// 自分のお題・役割を取得 v618
 // ==============================
 async function getMyAssignment(roomId) {
   const uid = await signIn();
@@ -337,7 +337,7 @@ async function getMyAssignment(roomId) {
 
 
 // ==============================
-// ゲーム開始 v617
+// ゲーム開始 v618
 // 参加者から1人ニセ絵師を選び、各自のお題を assignments に保存
 // ==============================
 async function startGame(roomId, gameSetup) {
@@ -434,7 +434,7 @@ async function startGame(roomId, gameSetup) {
 
   await batch.commit();
 
-  console.log("ゲーム開始 v617:", {
+  console.log("ゲーム開始 v618:", {
     roomId: cleanRoomId,
     fakeUid,
     fakeName: fakePlayer.name || "名無し",
