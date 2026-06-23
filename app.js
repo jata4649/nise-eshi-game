@@ -404,7 +404,7 @@ function isPlayerOnline(player) {
     return player.online === true;
   }
 
-  return Date.now() - lastSeenMs <= PRESENCE_TIMEOUT_MS;
+  return Date.now() - lastSeenMs <= APP_PRESENCE_TIMEOUT_MS;
 }
 
 function getOnlinePlayers(players) {
@@ -508,7 +508,8 @@ function startPresenceHeartbeat() {
 
   presenceTimerId = setInterval(() => {
     updateMyPresenceOnline();
-  }, PRESENCE_UPDATE_INTERVAL_MS);
+  }, APP_PRESENCE_UPDATE_INTERVAL_MS);
+
 }
 
 function stopPresenceHeartbeat() {
