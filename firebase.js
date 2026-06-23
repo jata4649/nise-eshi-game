@@ -136,7 +136,7 @@ function getCurrentUid() {
   return auth.currentUser ? auth.currentUser.uid : null;
 }
 
-async function signIn() {
+ function signIn() {
   try {
     if (auth.currentUser) {
       console.log("すでにログイン済み:", auth.currentUser.uid);
@@ -152,7 +152,7 @@ async function signIn() {
   }
 }
 
-async function assertHost(roomRef) {
+ function assertHost(roomRef) {
   const uid = await signIn();
   const roomSnap = await roomRef.get();
 
@@ -172,7 +172,7 @@ async function assertHost(roomRef) {
   };
 }
 
-async function deleteSubcollection(roomRef, collectionName) {
+ function deleteSubcollection(roomRef, collectionName) {
   const snapshot = await roomRef.collection(collectionName).get();
 
   if (snapshot.empty) {
@@ -221,7 +221,7 @@ function createPhaseData(phase, durationSec, extraData) {
 // ==============================
 // v624 プレゼンス更新
 // ==============================
-async function updateMyPresence(roomId) {
+ function updateMyPresence(roomId) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -247,7 +247,7 @@ async function updateMyPresence(roomId) {
   return true;
 }
 
-async function setMyOffline(roomId) {
+ function setMyOffline(roomId) {
   const uid = getCurrentUid();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -1243,7 +1243,7 @@ async function finishRoom(roomId) {
 // もう一度遊ぶ
 // ホストだけがロビーに戻せる
 // ==============================
-async function resetRoomToLobby(roomId) {
+ function resetRoomToLobby(roomId) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
