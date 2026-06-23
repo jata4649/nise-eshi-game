@@ -2013,3 +2013,85 @@ input:focus {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* ==============================
+   v616 投票同期・結果表示
+============================== */
+
+.vote-status-box {
+  margin: 14px 0;
+  padding: 14px;
+  text-align: center;
+  background: rgba(255, 248, 232, 0.9);
+  border: 2px solid rgba(43, 33, 24, 0.25);
+  border-radius: 16px;
+}
+
+.vote-status-box strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #2b2118;
+}
+
+.vote-status-box p {
+  margin: 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #80613d;
+}
+
+.vote-btn {
+  margin-bottom: 10px;
+}
+
+.vote-btn:disabled,
+.vote-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+  cursor: not-allowed;
+}
+
+.vote-result-list {
+  margin-top: 18px;
+}
+
+.vote-result-item {
+  margin-bottom: 12px;
+  padding: 14px;
+  background: rgba(255, 250, 240, 0.92);
+  border: 2px solid rgba(43, 33, 24, 0.25);
+  border-radius: 16px;
+}
+
+.vote-result-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.vote-result-main strong {
+  font-size: 16px;
+  font-weight: 900;
+  color: #2b2118;
+}
+
+.vote-result-main span {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ffd25c;
+  border: 2px solid #2b2118;
+  font-size: 13px;
+  font-weight: 900;
+  color: #2b2118;
+}
+
+.vote-result-item p {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #80613d;
+}
+
