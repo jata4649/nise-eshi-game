@@ -1457,6 +1457,79 @@ function renderReviewGallery(drawings, phaseLabel, fallbackImage) {
 
   grid.innerHTML = html;
 }
+function ensureVoteGalleryBox() {
+  let box = $("vote-gallery-box");
+  if (box) return box;
+
+  const voteList = $("vote-list");
+  if (!voteList) return null;
+
+  box = document.createElement("div");
+  box.id = "vote-gallery-box";
+  box.className = "vote-gallery-box";
+
+  voteList.insertAdjacentElement("afterend", box);
+
+  return box;
+}
+
+function renderVoteGallery(drawings) {
+  const box = ensureVoteGalleryBox();
+  if (!box) return;
+
+  const list = Array.isArray(drawings) ? drawings : [];
+
+  let html = `
+    <div class="vote-gallery-title">完成絵を見返す</div>
+  `;
+
+  if (list.length === 0) {
+    html += `
+      <div class="vote-gallery-empty">
+        完成絵を読み込み中...
+      </div>
+    `;
+  } else {
+    html += `<div class="vote-gallery-list">`;
+
+    list.forEach((drawing) => {
+      html += `
+        <div class="vote-gallery-card">
+          <div class="vote-gallery-name">${escapeHtml(drawing.name || "名無し")}</div>
+          <img class="vote-gallery-image" src="${drawing.image}" alt="${escapeHtml(drawing.name || "名無し")}の完成絵">
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+  }
+
+  box.innerHTML = html;
+}
+
+function startVoteGalleryListener() {
+  const oldBox = $("vote-gallery-box");
+  if (oldBox) oldBox.remove();
+
+  if (!currentRoomId) {
+    renderVoteGallery([]);
+    return;
+  }
+
+  if (!window.GameDB || !window.GameDB.listenDrawings) {
+    renderVoteGallery([]);
+    return;
+  }
+
+  try {
+    window.GameDB.listenDrawings(currentRoomId, "final", (drawings) => {
+      renderVoteGallery(drawings || []);
+    });
+  } catch (error) {
+    console.error("投票画面ギャラリー開始失敗:", error);
+    renderVoteGallery([]);
+  }
+}
 
 function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
   if (reviewGalleryUnsubscribe) {
@@ -1794,6 +1867,7 @@ function showVoteScreen(voteRound, candidates) {
   showScreen("vote-screen");
   startVoteListener(currentVoteRound);
   renderVoteWaiting(latestVotes);
+  startVoteGalleryListener();
 }
 
 async function handleVote(votedPlayer) {
@@ -2266,6 +2340,10 @@ function resetLocalRoundStateForLobby() {
 
   const resultDisplay = $("result-display");
   if (resultDisplay) resultDisplay.innerHTML = "";
+
+  const voteGalleryBox = $("vote-gallery-box");
+  if (voteGalleryBox) voteGalleryBox.remove();
+
 
   const oldStatus = $("vote-status-box");
   if (oldStatus) oldStatus.remove();
