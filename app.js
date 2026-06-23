@@ -524,7 +524,7 @@ function startHostTransferMonitor() {
 
   hostTransferTimerId = setInterval(() => {
     checkAndTransferHostIfNeeded();
-  }, HOST_TRANSFER_CHECK_INTERVAL_MS);
+  }, APP_HOST_TRANSFER_CHECK_INTERVAL_MS);
 }
 
 function stopHostTransferMonitor() {
