@@ -1,4 +1,4 @@
-console.log("firebase.js version 619 loaded");
+console.log("firebase.js version 620 loaded");
 
 // ==============================
 // Firebase 設定
@@ -34,32 +34,10 @@ try {
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-async function deleteSubcollection(roomRef, collectionName) {
-  const snapshot = await roomRef.collection(collectionName).get();
 
-  if (snapshot.empty) {
-    console.log(collectionName + " は空です");
-    return;
-  }
-
-  let batch = db.batch();
-  let count = 0;
-
-  snapshot.forEach((doc) => {
-    batch.delete(doc.ref);
-    count++;
-
-    if (count >= 450) {
-      // 今回のゲーム規模ではほぼ来ないが安全用
-    }
-  });
-
-  await batch.commit();
-
-  console.log(collectionName + " を削除しました:", count);
-}
-
-
+// ==============================
+// リスナー管理
+// ==============================
 let unsubscribePlayers = null;
 let unsubscribeRoom = null;
 let unsubscribeDrawings = null;
@@ -75,6 +53,7 @@ function normalizeRoomId(roomId) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 }
+
 function topicValueToText(value) {
   if (value == null) return "？？？";
 
@@ -97,7 +76,9 @@ function topicValueToText(value) {
       "topic",
       "name",
       "normal",
+      "normalTopic",
       "fake",
+      "fakeTopic",
       "main",
       "citizen",
       "answer",
@@ -154,6 +135,72 @@ async function signIn() {
   }
 }
 
+async function assertHost(roomRef) {
+  const uid = await signIn();
+  const roomSnap = await roomRef.get();
+
+  if (!roomSnap.exists) {
+    throw new Error("部屋が存在しません");
+  }
+
+  const room = roomSnap.data();
+
+  if (room.hostUid !== uid) {
+    throw new Error("この操作ができるのはホストだけです");
+  }
+
+  return {
+    uid,
+    room
+  };
+}
+
+async function deleteSubcollection(roomRef, collectionName) {
+  const snapshot = await roomRef.collection(collectionName).get();
+
+  if (snapshot.empty) {
+    console.log(collectionName + " は空です");
+    return;
+  }
+
+  let batch = db.batch();
+  let count = 0;
+  let total = 0;
+
+  for (const doc of snapshot.docs) {
+    batch.delete(doc.ref);
+    count++;
+    total++;
+
+    if (count >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      count = 0;
+    }
+  }
+
+  if (count > 0) {
+    await batch.commit();
+  }
+
+  console.log(collectionName + " を削除しました:", total);
+}
+
+function createPhaseData(phase, durationSec, extraData) {
+  const nowMs = Date.now();
+  const startDelayMs = 1200;
+  const phaseStartAtMs = nowMs + startDelayMs;
+
+  return {
+    phase: phase,
+    phaseStartAtMs: phaseStartAtMs,
+    phaseDurationSec: durationSec || 0,
+    phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    ...(extraData || {})
+  };
+}
+
 
 // ==============================
 // 部屋作成
@@ -173,7 +220,16 @@ async function createRoom(roomId, playerName) {
     roomId: cleanRoomId,
     hostUid: uid,
     status: "lobby",
+    phase: "lobby",
+    phaseStartAtMs: null,
+    phaseDurationSec: 0,
     topic: null,
+    answer: null,
+    gameId: null,
+    voteRound: "main",
+    runoffRound: 0,
+    runoffCandidates: null,
+    resultData: null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -234,7 +290,7 @@ async function roomExists(roomId) {
 
 
 // ==============================
-// 部屋参加 v619
+// 部屋参加
 // ゲーム中・終了済みの部屋には途中参加できない
 // ==============================
 async function joinRoom(roomId, playerName) {
@@ -283,7 +339,6 @@ async function joinRoom(roomId, playerName) {
   console.log("部屋参加成功:", cleanRoomId, playerName);
   return cleanRoomId;
 }
-
 
 
 // ==============================
@@ -401,7 +456,7 @@ function listenRoom(roomId, callback) {
 
 
 // ==============================
-// 自分のお題・役割を取得 v618
+// 自分のお題・役割を取得
 // ==============================
 async function getMyAssignment(roomId) {
   const uid = await signIn();
@@ -430,8 +485,9 @@ async function getMyAssignment(roomId) {
 
 
 // ==============================
-// ゲーム開始 v619
+// ゲーム開始 v620
 // 古い絵・投票・役割を削除してから新ゲーム開始
+// Firestore phase 同期方式
 // ==============================
 async function startGame(roomId, gameSetup) {
   const uid = await signIn();
@@ -482,7 +538,6 @@ async function startGame(roomId, gameSetup) {
     throw new Error("ニセ絵師の選択に失敗しました");
   }
 
-  // 前回データ掃除
   await deleteSubcollection(roomRef, "drawings");
   await deleteSubcollection(roomRef, "votes");
   await deleteSubcollection(roomRef, "assignments");
@@ -495,10 +550,18 @@ async function startGame(roomId, gameSetup) {
     roomRef,
     {
       status: "playing",
+      phase: "topic",
+      phaseStartAtMs: Date.now() + 1200,
+      phaseDurationSec: 5,
       gameId: gameId,
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
       finishedAt: null,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+
+      voteRound: "main",
+      runoffRound: 0,
+      runoffCandidates: null,
+      resultData: null,
 
       answer: {
         fakeUid: fakeUid,
@@ -534,7 +597,7 @@ async function startGame(roomId, gameSetup) {
 
   await batch.commit();
 
-  console.log("ゲーム開始 v619:", {
+  console.log("ゲーム開始 v620:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
@@ -546,6 +609,99 @@ async function startGame(roomId, gameSetup) {
 
 const startOnlineGame = startGame;
 
+
+// ==============================
+// フェーズ更新 v620
+// ホストだけが実行
+// ==============================
+async function updateRoomPhase(roomId, phase, durationSec, extraData) {
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  if (!phase) {
+    throw new Error("phaseが空です");
+  }
+
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  await assertHost(roomRef);
+
+  const phaseData = createPhaseData(phase, durationSec || 0, extraData || {});
+
+  await roomRef.set(phaseData, { merge: true });
+
+  console.log("phase更新:", cleanRoomId, phaseData);
+}
+
+
+// ==============================
+// 同票再議論 v620
+// ==============================
+async function setRunoff(roomId, candidates, round) {
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  await assertHost(roomRef);
+
+  const runoffRound = Number(round || 1);
+  const voteRound = "runoff_" + runoffRound;
+
+  await roomRef.set(
+    {
+      phase: "runoffDiscussion",
+      phaseStartAtMs: Date.now() + 1200,
+      phaseDurationSec: 60,
+      runoffRound: runoffRound,
+      voteRound: voteRound,
+      runoffCandidates: Array.isArray(candidates) ? candidates : [],
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("同票再議論へ:", {
+    roomId: cleanRoomId,
+    runoffRound,
+    voteRound,
+    candidates
+  });
+}
+
+
+// ==============================
+// 結果保存 v620
+// ==============================
+async function setResult(roomId, resultData) {
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  await assertHost(roomRef);
+
+  await roomRef.set(
+    {
+      phase: "result",
+      phaseStartAtMs: Date.now() + 1200,
+      phaseDurationSec: 0,
+      resultData: resultData || null,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("結果保存:", cleanRoomId, resultData);
+}
 
 
 // ==============================
@@ -567,6 +723,10 @@ async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
     throw new Error("画像データが空です");
   }
 
+  const roomSnap = await db.collection("rooms").doc(cleanRoomId).get();
+  const room = roomSnap.exists ? roomSnap.data() : {};
+  const gameId = room.gameId || null;
+
   const drawingId = `${phase}_${uid}`;
 
   await db
@@ -580,6 +740,7 @@ async function saveDrawing(roomId, phase, playerName, imageDataUrl) {
         name: playerName || "名無し",
         phase: phase,
         image: imageDataUrl,
+        gameId: gameId,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       },
       { merge: true }
@@ -643,9 +804,12 @@ function listenDrawings(roomId, phase, callback) {
 
 
 // ==============================
-// 投票を保存
+// 投票を保存 v620
+// voteRoundごとに保存
+// main, runoff_1, runoff_2 ...
+// 自分投票も可能
 // ==============================
-async function saveVote(roomId, votedPlayer) {
+async function saveVote(roomId, votedPlayer, voteRound) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -656,6 +820,9 @@ async function saveVote(roomId, votedPlayer) {
   if (!votedPlayer || !votedPlayer.uid) {
     throw new Error("投票先が不正です");
   }
+
+  const round = voteRound || "main";
+  const voteDocId = `${round}_${uid}`;
 
   let myName = "名無し";
 
@@ -674,34 +841,54 @@ async function saveVote(roomId, votedPlayer) {
     console.warn("自分の名前取得失敗:", error);
   }
 
+  const roomSnap = await db.collection("rooms").doc(cleanRoomId).get();
+  const room = roomSnap.exists ? roomSnap.data() : {};
+  const gameId = room.gameId || null;
+
   await db
     .collection("rooms")
     .doc(cleanRoomId)
     .collection("votes")
-    .doc(uid)
+    .doc(voteDocId)
     .set(
       {
         uid: uid,
         name: myName,
         votedUid: votedPlayer.uid,
         votedName: votedPlayer.name || "名無し",
+        voteRound: round,
+        gameId: gameId,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       },
       { merge: true }
     );
 
-  console.log("投票保存:", cleanRoomId, uid, "->", votedPlayer.uid);
+  console.log("投票保存:", cleanRoomId, round, uid, "->", votedPlayer.uid);
 }
 
 
 // ==============================
-// 投票を監視
+// 投票を監視 v620
+// voteRound指定可能
 // ==============================
-function listenVotes(roomId, callback) {
+function listenVotes(roomId, voteRound, callback) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
     throw new Error("部屋IDが空です");
+  }
+
+  let round = voteRound;
+  let cb = callback;
+
+  // v619互換: listenVotes(roomId, callback)
+  if (typeof voteRound === "function") {
+    cb = voteRound;
+    round = "main";
+  }
+
+  if (!round) {
+    round = "main";
   }
 
   if (unsubscribeVotes) {
@@ -713,6 +900,7 @@ function listenVotes(roomId, callback) {
     .collection("rooms")
     .doc(cleanRoomId)
     .collection("votes")
+    .where("voteRound", "==", round)
     .onSnapshot(
       (snapshot) => {
         const votes = [];
@@ -724,8 +912,8 @@ function listenVotes(roomId, callback) {
           });
         });
 
-        console.log("votes更新:", votes);
-        callback(votes);
+        console.log("votes更新:", round, votes);
+        if (typeof cb === "function") cb(votes);
       },
       (error) => {
         console.error("votes監視エラー:", error);
@@ -748,27 +936,17 @@ async function clearVotes(roomId) {
 
   await signIn();
 
-  const snapshot = await db
-    .collection("rooms")
-    .doc(cleanRoomId)
-    .collection("votes")
-    .get();
-
-  const batch = db.batch();
-
-  snapshot.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-
-  await batch.commit();
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  await deleteSubcollection(roomRef, "votes");
 
   console.log("投票を削除しました:", cleanRoomId);
 }
+
+
 // ==============================
-// 結果後に部屋を finished にする v619
+// 結果後に部屋を finished にする
 // ==============================
 async function finishRoom(roomId) {
-  const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
@@ -776,21 +954,12 @@ async function finishRoom(roomId) {
   }
 
   const roomRef = db.collection("rooms").doc(cleanRoomId);
-  const roomSnap = await roomRef.get();
-
-  if (!roomSnap.exists) {
-    throw new Error("部屋が存在しません");
-  }
-
-  const room = roomSnap.data();
-
-  if (room.hostUid !== uid) {
-    throw new Error("部屋を終了できるのはホストだけです");
-  }
+  await assertHost(roomRef);
 
   await roomRef.set(
     {
       status: "finished",
+      phase: "finished",
       finishedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     },
@@ -802,11 +971,10 @@ async function finishRoom(roomId) {
 
 
 // ==============================
-// もう一度遊ぶ v619
+// もう一度遊ぶ
 // ホストだけがロビーに戻せる
 // ==============================
 async function resetRoomToLobby(roomId) {
-  const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
@@ -814,17 +982,8 @@ async function resetRoomToLobby(roomId) {
   }
 
   const roomRef = db.collection("rooms").doc(cleanRoomId);
-  const roomSnap = await roomRef.get();
-
-  if (!roomSnap.exists) {
-    throw new Error("部屋が存在しません");
-  }
-
-  const room = roomSnap.data();
-
-  if (room.hostUid !== uid) {
-    throw new Error("もう一度遊ぶを実行できるのはホストだけです");
-  }
+  const hostCheck = await assertHost(roomRef);
+  const room = hostCheck.room;
 
   await deleteSubcollection(roomRef, "drawings");
   await deleteSubcollection(roomRef, "votes");
@@ -851,9 +1010,16 @@ async function resetRoomToLobby(roomId) {
     roomRef,
     {
       status: "lobby",
+      phase: "lobby",
+      phaseStartAtMs: null,
+      phaseDurationSec: 0,
       answer: null,
       topic: null,
       gameId: null,
+      voteRound: "main",
+      runoffRound: 0,
+      runoffCandidates: null,
+      resultData: null,
       startedAt: null,
       finishedAt: null,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -904,18 +1070,28 @@ window.GameDB = {
   roomExists,
   joinRoom,
   setReady,
+
   listenPlayers,
   listenRoom,
+
   startGame,
   startOnlineGame,
+
+  updateRoomPhase,
+  setRunoff,
+  setResult,
+
   stopListeners,
   getCurrentUid,
   getMyAssignment,
+
   saveDrawing,
   listenDrawings,
+
   saveVote,
   listenVotes,
   clearVotes,
+
   finishRoom,
   resetRoomToLobby
 };
