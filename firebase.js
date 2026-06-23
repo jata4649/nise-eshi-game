@@ -49,6 +49,64 @@ function normalizeRoomId(roomId) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 }
+function topicValueToText(value) {
+  if (value == null) return "？？？";
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "？？？";
+    return topicValueToText(value[0]);
+  }
+
+  if (typeof value === "object") {
+    const keys = [
+      "word",
+      "topic",
+      "name",
+      "normal",
+      "fake",
+      "main",
+      "citizen",
+      "answer",
+      "text",
+      "title",
+      "label",
+      "value"
+    ];
+
+    for (const key of keys) {
+      if (value[key] != null) {
+        const text = topicValueToText(value[key]);
+        if (text && text !== "[object Object]") {
+          return text;
+        }
+      }
+    }
+
+    const values = Object.values(value);
+    for (const item of values) {
+      const text = topicValueToText(item);
+      if (text && text !== "[object Object]") {
+        return text;
+      }
+    }
+  }
+
+  const fallback = String(value);
+
+  if (fallback === "[object Object]") {
+    return "？？？";
+  }
+
+  return fallback;
+}
 
 function getCurrentUid() {
   return auth.currentUser ? auth.currentUser.uid : null;
@@ -379,9 +437,10 @@ async function startGame(roomId, gameSetup) {
     throw new Error("ゲーム設定が不正です");
   }
 
-  const normalTopic = String(gameSetup.normalTopic);
-  const fakeTopic = String(gameSetup.fakeTopic);
+  const normalTopic = topicValueToText(gameSetup.normalTopic);
+  const fakeTopic = topicValueToText(gameSetup.fakeTopic);
   const fakeUid = String(gameSetup.fakeUid);
+
 
   const fakePlayer = players.find((player) => player.uid === fakeUid);
 
