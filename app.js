@@ -1,7 +1,7 @@
-console.log("app.js version 623 loaded");
+console.log("app.js version 624 loaded");
 
 // ==============================
-// v623 バージョン表示
+// v624 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v623";
+  badge.textContent = "v624";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "623");
+      url.searchParams.set("v", "624");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "623");
+      url.searchParams.set("v", "624");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -81,6 +81,8 @@ function showHardReloadButton() {
 
   box.appendChild(button);
   box.appendChild(note);
+
+  // TOPページの一番下に置く
   topScreen.appendChild(box);
 }
 showHardReloadButton();
@@ -108,6 +110,11 @@ let timerAnimationId = null;
 let reviewTimerAnimationId = null;
 let syncedTimerAnimationId = null;
 let hostPhaseTimerId = null;
+
+// v624 presence / host transfer
+let presenceTimerId = null;
+let hostTransferTimerId = null;
+let lastHostTransferAttemptKey = null;
 
 let midImageDataUrl = null;
 let finalImageDataUrl = null;
@@ -137,6 +144,11 @@ const FINAL_DISCUSSION_SECONDS = 60;
 const RUNOFF_DISCUSSION_SECONDS = 60;
 const RUNOFF_LIMIT = 2;
 const LOGICAL_CANVAS_SIZE = 1000;
+
+// v624 presence settings
+const PRESENCE_TIMEOUT_MS = 25000;
+const PRESENCE_UPDATE_INTERVAL_MS = 10000;
+const HOST_TRANSFER_CHECK_INTERVAL_MS = 12000;
 
 
 // ==============================
@@ -184,7 +196,7 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v623 で読み込まれているか\n" +
+      "1. firebase.js が v624 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK が読み込まれているか"
     );
@@ -321,6 +333,266 @@ function getTopicsArray() {
 
 
 // ==============================
+// v624 presence / host transfer helpers
+// ==============================
+function getTimestampMs(value) {
+  if (!value) return 0;
+
+  if (typeof value === "number") return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (typeof value === "object") {
+    if (typeof value.toMillis === "function") {
+      try {
+        return value.toMillis();
+      } catch (error) {
+        return 0;
+      }
+    }
+
+    if (typeof value.seconds === "number") {
+      return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000);
+    }
+
+    if (typeof value._seconds === "number") {
+      return value._seconds * 1000 + Math.floor((value._nanoseconds || 0) / 1000000);
+    }
+  }
+
+  return 0;
+}
+
+function getPlayerLastSeenMs(player) {
+  if (!player) return 0;
+
+  return Number(player.lastSeenAtMs || 0) ||
+    getTimestampMs(player.lastSeenAt) ||
+    getTimestampMs(player.updatedAt) ||
+    getTimestampMs(player.joinedAt) ||
+    Number(player.joinedAtMs || 0) ||
+    0;
+}
+
+function getPlayerJoinedMs(player) {
+  if (!player) return 0;
+
+  return Number(player.joinedAtMs || 0) ||
+    getTimestampMs(player.joinedAt) ||
+    getTimestampMs(player.createdAt) ||
+    getPlayerLastSeenMs(player) ||
+    0;
+}
+
+function isPlayerOnline(player) {
+  if (!player) return false;
+
+  const myUid = getMyUidSafe();
+
+  if (player.uid && myUid && player.uid === myUid) {
+    return true;
+  }
+
+  if (player.online === false) {
+    return false;
+  }
+
+  const lastSeenMs = getPlayerLastSeenMs(player);
+
+  if (!lastSeenMs) {
+    return player.online === true;
+  }
+
+  return Date.now() - lastSeenMs <= PRESENCE_TIMEOUT_MS;
+}
+
+function getOnlinePlayers(players) {
+  return (players || []).filter((player) => {
+    return player && player.uid && isPlayerOnline(player);
+  });
+}
+
+function getCurrentHostPlayer() {
+  const hostUid = currentRoomData && currentRoomData.hostUid;
+  if (!hostUid) return null;
+  return getPlayerByUid(hostUid);
+}
+
+function isCurrentHostOnline() {
+  const hostPlayer = getCurrentHostPlayer();
+
+  if (!hostPlayer) {
+    return false;
+  }
+
+  return isPlayerOnline(hostPlayer);
+}
+
+function pickNextHostPlayer(players) {
+  const onlinePlayers = getOnlinePlayers(players);
+
+  if (onlinePlayers.length <= 0) return null;
+
+  const sorted = onlinePlayers.slice().sort((a, b) => {
+    const aJoined = getPlayerJoinedMs(a);
+    const bJoined = getPlayerJoinedMs(b);
+
+    if (aJoined !== bJoined) return aJoined - bJoined;
+
+    const aName = String(a.name || "");
+    const bName = String(b.name || "");
+    return aName.localeCompare(bName, "ja");
+  });
+
+  return sorted[0] || null;
+}
+
+async function updateMyPresenceOnline() {
+  try {
+    if (!currentRoomId) return;
+    if (!window.GameDB) return;
+
+    if (typeof window.GameDB.updatePresence === "function") {
+      await window.GameDB.updatePresence(currentRoomId);
+      return;
+    }
+
+    if (typeof window.GameDB.updateMyPresence === "function") {
+      await window.GameDB.updateMyPresence(currentRoomId);
+      return;
+    }
+
+    if (typeof window.GameDB.setPresence === "function") {
+      await window.GameDB.setPresence(currentRoomId, true);
+      return;
+    }
+
+    console.warn("presence更新関数がfirebase.jsにありません");
+  } catch (error) {
+    console.warn("presence更新失敗:", error);
+  }
+}
+
+async function transferHostToPlayer(newHostUid) {
+  try {
+    if (!currentRoomId) return;
+    if (!newHostUid) return;
+    if (!window.GameDB) return;
+
+    if (typeof window.GameDB.transferHost === "function") {
+      await window.GameDB.transferHost(currentRoomId, newHostUid);
+      return;
+    }
+
+    if (typeof window.GameDB.transferHostTo === "function") {
+      await window.GameDB.transferHostTo(currentRoomId, newHostUid);
+      return;
+    }
+
+    if (typeof window.GameDB.updateHost === "function") {
+      await window.GameDB.updateHost(currentRoomId, newHostUid);
+      return;
+    }
+
+    console.warn("ホスト移譲関数がfirebase.jsにありません");
+  } catch (error) {
+    console.error("ホスト移譲失敗:", error);
+  }
+}
+
+function startPresenceHeartbeat() {
+  stopPresenceHeartbeat();
+
+  updateMyPresenceOnline();
+
+  presenceTimerId = setInterval(() => {
+    updateMyPresenceOnline();
+  }, PRESENCE_UPDATE_INTERVAL_MS);
+}
+
+function stopPresenceHeartbeat() {
+  if (presenceTimerId) {
+    clearInterval(presenceTimerId);
+    presenceTimerId = null;
+  }
+}
+
+function startHostTransferMonitor() {
+  stopHostTransferMonitor();
+
+  hostTransferTimerId = setInterval(() => {
+    checkAndTransferHostIfNeeded();
+  }, HOST_TRANSFER_CHECK_INTERVAL_MS);
+}
+
+function stopHostTransferMonitor() {
+  if (hostTransferTimerId) {
+    clearInterval(hostTransferTimerId);
+    hostTransferTimerId = null;
+  }
+}
+
+async function checkAndTransferHostIfNeeded() {
+  try {
+    if (!currentRoomId) return;
+    if (!currentRoomData) return;
+    if (!Array.isArray(currentPlayers) || currentPlayers.length <= 0) return;
+
+    const myUid = getMyUidSafe();
+    if (!myUid) return;
+
+    const hostUid = currentRoomData.hostUid;
+    const hostPlayer = getCurrentHostPlayer();
+    const hostOnline = hostPlayer ? isPlayerOnline(hostPlayer) : false;
+
+    if (hostUid && hostOnline) {
+      return;
+    }
+
+    const nextHost = pickNextHostPlayer(currentPlayers);
+
+    if (!nextHost || !nextHost.uid) {
+      return;
+    }
+
+    if (nextHost.uid !== myUid) {
+      return;
+    }
+
+    if (hostUid === nextHost.uid) {
+      return;
+    }
+
+    const transferKey = `${currentRoomId}_${hostUid || "nohost"}_${nextHost.uid}_${currentRoomData.updatedAtMs || currentRoomData.phaseStartAtMs || ""}`;
+
+    if (lastHostTransferAttemptKey === transferKey) {
+      return;
+    }
+
+    lastHostTransferAttemptKey = transferKey;
+
+    console.log("ホストがオフラインのためホスト移譲を試行:", {
+      oldHostUid: hostUid,
+      newHostUid: nextHost.uid,
+      newHostName: nextHost.name || "名無し"
+    });
+
+    await transferHostToPlayer(nextHost.uid);
+  } catch (error) {
+    console.error("ホスト移譲チェック失敗:", error);
+  }
+}
+
+function stopPresenceSystems() {
+  stopPresenceHeartbeat();
+  stopHostTransferMonitor();
+}
+
+
+// ==============================
 // お題ペア v623 topics.jsから取得
 // ==============================
 function pickTopicPair() {
@@ -389,7 +661,6 @@ function pickTopicPair() {
     console.error("お題ペア取得失敗:", error);
   }
 
-  // 最低限の保険
   const fallbackPairs = [
     { normalTopic: "猫", fakeTopic: "虎", category: "動物" },
     { normalTopic: "犬", fakeTopic: "狼", category: "動物" },
@@ -459,23 +730,37 @@ function renderLobbyPlayers(players) {
 
   players.forEach((player) => {
     const item = document.createElement("li");
-    item.className = "player-item";
-
     const isHost = player.uid === hostUid;
+    const online = isPlayerOnline(player);
+
+    item.className = `player-item ${online ? "player-online" : "player-offline"}`;
 
     let statusText = "";
+    let statusClass = "";
+
     if (isHost) {
       statusText = "ホスト";
+      statusClass = "host";
     } else if (player.ready) {
       statusText = "準備OK";
+      statusClass = "ready";
     } else {
       statusText = "準備待ち";
+      statusClass = "waiting";
     }
 
+    const onlineLabel = online ? "オンライン" : "オフライン";
+
     item.innerHTML = `
-      <span class="player-name">${escapeHtml(player.name || "名無し")}</span>
-      <span class="player-status ${isHost ? "host" : player.ready ? "ready" : "waiting"}">
+      <span class="player-name">
+        ${escapeHtml(player.name || "名無し")}
+        <span class="online-dot ${online ? "online" : "offline"}"></span>
+      </span>
+      <span class="player-status ${statusClass}">
         ${statusText}
+      </span>
+      <span class="player-presence ${online ? "online" : "offline"}">
+        ${onlineLabel}
       </span>
     `;
 
@@ -643,11 +928,15 @@ function startOnlineListeners() {
     GameDB.stopListeners();
   }
 
+  startPresenceHeartbeat();
+  startHostTransferMonitor();
+
   GameDB.listenPlayers(currentRoomId, (players) => {
     currentPlayers = players || [];
 
     renderLobbyPlayers(currentPlayers);
     updateLobbyControlButtons();
+    checkAndTransferHostIfNeeded();
 
     if (
       currentRoomData &&
@@ -661,6 +950,7 @@ function startOnlineListeners() {
   GameDB.listenRoom(currentRoomId, async (room) => {
     currentRoomData = room || null;
     updateLobbyControlButtons();
+    checkAndTransferHostIfNeeded();
 
     if (!room) return;
 
@@ -862,6 +1152,8 @@ async function enterRoomFlow() {
       await GameDB.joinRoom(currentRoomId, playerName);
     }
 
+    await updateMyPresenceOnline();
+
     const display = $("room-id-display");
     if (display) display.textContent = currentRoomId;
 
@@ -878,8 +1170,6 @@ async function enterRoomFlow() {
     );
   }
 }
-
-
 // ==============================
 // お題画面
 // ==============================
@@ -1166,7 +1456,7 @@ function getCanvasImage() {
 
 
 // ==============================
-// 描画フェーズ v621 同期
+// 描画フェーズ v624 同期
 // ==============================
 function startFirstDrawingSynced(room) {
   drawingPhase = 1;
@@ -1344,6 +1634,7 @@ function renderReviewGallery(drawings, phaseLabel, fallbackImage) {
 
   grid.innerHTML = html;
 }
+
 function ensureVoteGalleryBox() {
   let box = $("vote-gallery-box");
   if (box) return box;
@@ -1449,7 +1740,7 @@ function startDrawingGalleryListener(phase, phaseLabel, fallbackImage) {
 
 
 // ==============================
-// 公開・討論 v621 同期
+// 公開・討論 v624 同期
 // ==============================
 function showMidReviewSynced(room) {
   const phaseLabel = $("review-phase-label");
@@ -1554,7 +1845,7 @@ function showRunoffDiscussionScreen(room) {
 
 
 // ==============================
-// 投票・結果同期 v621
+// 投票・結果同期 v624
 // ==============================
 function getValidVotingPlayers() {
   if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
@@ -1583,6 +1874,7 @@ function getMyVote(votes) {
 
   return (votes || []).find((vote) => vote.uid === myUid) || null;
 }
+
 function renderVoteWaiting(votes) {
   const voteList = $("vote-list");
   if (!voteList) return;
@@ -1608,7 +1900,8 @@ function renderVoteWaiting(votes) {
   });
 
   const notVotedNames = notVotedPlayers.map((player) => {
-    return escapeHtml(player.name || "名無し");
+    const onlineMark = isPlayerOnline(player) ? "" : "（オフライン）";
+    return escapeHtml((player.name || "名無し") + onlineMark);
   });
 
   const roundLabel = currentVoteRound === "main"
@@ -1728,6 +2021,7 @@ function showVoteScreen(voteRound, candidates) {
 
     showScreen("vote-screen");
     startVoteListener(currentVoteRound);
+    startVoteGalleryListener();
     return;
   }
 
@@ -1739,10 +2033,12 @@ function showVoteScreen(voteRound, candidates) {
     button.className = "secondary-btn vote-btn";
 
     const isMe = player.uid === myUid;
+    const online = isPlayerOnline(player);
+    const onlineText = online ? "" : "（オフライン）";
 
     button.textContent = isMe
-      ? `${player.name || "名無し"}（自分）`
-      : player.name || "名無し";
+      ? `${player.name || "名無し"}（自分）${onlineText}`
+      : `${player.name || "名無し"}${onlineText}`;
 
     button.addEventListener("click", async () => {
       await handleVote(player);
@@ -1790,7 +2086,6 @@ async function handleVote(votedPlayer) {
     );
   }
 }
-
 function buildVoteResult(votes, candidateList) {
   const basePlayers = Array.isArray(candidateList) && candidateList.length > 0
     ? candidateList
@@ -2231,7 +2526,6 @@ function resetLocalRoundStateForLobby() {
   const voteGalleryBox = $("vote-gallery-box");
   if (voteGalleryBox) voteGalleryBox.remove();
 
-
   const oldStatus = $("vote-status-box");
   if (oldStatus) oldStatus.remove();
 
@@ -2254,6 +2548,7 @@ function resetLocalRoundStateForLobby() {
 // ==============================
 function backToTop() {
   resetLocalRoundStateForLobby();
+  stopPresenceSystems();
 
   if (window.GameDB && window.GameDB.stopListeners) {
     window.GameDB.stopListeners();
@@ -2280,6 +2575,8 @@ function backToTop() {
   hasVoted = false;
   resultShown = false;
   latestVotes = [];
+
+  lastHostTransferAttemptKey = null;
 
   const roomInput = $("room-id-input");
   if (roomInput) roomInput.value = "";
@@ -2350,6 +2647,7 @@ function setupEvents() {
         const nextReady = !(me && me.ready);
 
         await GameDB.setReady(currentRoomId, nextReady);
+        await updateMyPresenceOnline();
         updateLobbyControlButtons();
       } catch (error) {
         console.error("準備OK失敗:", error);
@@ -2402,6 +2700,7 @@ function setupEvents() {
         }
 
         resetLocalRoundStateForLobby();
+        await updateMyPresenceOnline();
 
         await GameDB.startOnlineGame(currentRoomId, {
           normalTopic: topicPair.normalTopic,
@@ -2424,6 +2723,25 @@ function setupEvents() {
   if (backTopBtn) {
     backTopBtn.addEventListener("click", backToTop);
   }
+
+  window.addEventListener("beforeunload", () => {
+    try {
+      stopPresenceSystems();
+
+      if (window.GameDB && typeof window.GameDB.setPresence === "function" && currentRoomId) {
+        window.GameDB.setPresence(currentRoomId, false);
+      }
+    } catch (error) {
+      console.warn("beforeunload presence更新失敗:", error);
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      updateMyPresenceOnline();
+      startPresenceHeartbeat();
+    }
+  });
 }
 
 
@@ -2442,7 +2760,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v623 initialized");
+  console.log("app.js v624 initialized");
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
