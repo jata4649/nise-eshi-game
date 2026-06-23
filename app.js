@@ -24,7 +24,6 @@ function showVersionBadge() {
   badge.style.pointerEvents = "none";
   document.body.appendChild(badge);
 }
-
 showVersionBadge();
 
 
@@ -69,7 +68,6 @@ function showHardReloadButton() {
       const url = new URL(window.location.href);
       url.searchParams.set("v", "617");
       url.searchParams.set("reload", Date.now().toString());
-
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
@@ -84,7 +82,6 @@ function showHardReloadButton() {
   box.appendChild(note);
   topScreen.appendChild(box);
 }
-
 showHardReloadButton();
 
 
@@ -94,6 +91,9 @@ showHardReloadButton();
 let currentRoomId = null;
 let playerName = null;
 let currentTopic = null;
+
+let myAssignment = null;
+let isFakeArtist = false;
 
 let currentPlayers = [];
 let currentRoomData = null;
@@ -126,7 +126,6 @@ const FIRST_DRAW_SECONDS = 15;
 const SECOND_DRAW_SECONDS = 25;
 const MID_DISCUSSION_SECONDS = 60;
 const FINAL_DISCUSSION_SECONDS = 60;
-
 const LOGICAL_CANVAS_SIZE = 1000;
 
 
@@ -156,9 +155,7 @@ function showScreen(screenId) {
   });
 
   const target = $(screenId);
-  if (target) {
-    target.classList.add("active");
-  }
+  if (target) target.classList.add("active");
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -183,18 +180,15 @@ function requireGameDB() {
     );
     throw new Error("GameDB is not loaded");
   }
-
   return window.GameDB;
 }
 
 function createRoomId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let result = "";
-
   for (let i = 0; i < 5; i++) {
     result += chars[Math.floor(Math.random() * chars.length)];
   }
-
   return result;
 }
 
@@ -223,11 +217,7 @@ function getGuestPlayers() {
 
 function areAllGuestsReady() {
   const guestPlayers = getGuestPlayers();
-
-  if (guestPlayers.length <= 0) {
-    return false;
-  }
-
+  if (guestPlayers.length <= 0) return false;
   return guestPlayers.every((player) => player.ready === true);
 }
 
@@ -237,40 +227,10 @@ function canHostStartGame() {
   return areAllGuestsReady();
 }
 
-function pickRandomTopic() {
-  try {
-    if (typeof getRandomTopic === "function") {
-      return getRandomTopic();
-    }
-
-    if (typeof pickTopic === "function") {
-      return pickTopic();
-    }
-
-    if (typeof pickRandomTheme === "function") {
-      return pickRandomTheme();
-    }
-
-    if (Array.isArray(window.TOPICS) && window.TOPICS.length > 0) {
-      return window.TOPICS[Math.floor(Math.random() * window.TOPICS.length)];
-    }
-
-    if (typeof TOPICS !== "undefined" && Array.isArray(TOPICS) && TOPICS.length > 0) {
-      return TOPICS[Math.floor(Math.random() * TOPICS.length)];
-    }
-  } catch (error) {
-    console.error("お題取得エラー:", error);
-  }
-
-  return "猫";
-}
-
 function topicToText(topic) {
   if (topic == null) return "？？？";
 
-  if (typeof topic === "string") {
-    return topic;
-  }
+  if (typeof topic === "string") return topic;
 
   if (typeof topic === "object") {
     if (topic.word) return topic.word;
@@ -281,6 +241,98 @@ function topicToText(topic) {
   }
 
   return String(topic);
+}
+
+function getTopicTextFromAny(topic) {
+  if (topic == null) return null;
+
+  if (typeof topic === "string") return topic;
+
+  if (typeof topic === "object") {
+    if (topic.word) return String(topic.word);
+    if (topic.topic) return String(topic.topic);
+    if (topic.name) return String(topic.name);
+    if (topic.normal) return String(topic.normal);
+    if (topic.answer) return String(topic.answer);
+  }
+
+  return String(topic);
+}
+
+function getTopicsArray() {
+  if (Array.isArray(window.TOPICS) && window.TOPICS.length > 0) {
+    return window.TOPICS;
+  }
+
+  if (typeof TOPICS !== "undefined" && Array.isArray(TOPICS) && TOPICS.length > 0) {
+    return TOPICS;
+  }
+
+  return [];
+}
+
+function pickTopicPair() {
+  try {
+    const topics = getTopicsArray();
+
+    if (topics.length > 0) {
+      const raw = topics[Math.floor(Math.random() * topics.length)];
+
+      if (raw && typeof raw === "object") {
+        if (raw.normal && raw.fake) {
+          return {
+            normalTopic: String(raw.normal),
+            fakeTopic: String(raw.fake)
+          };
+        }
+
+        if (raw.main && raw.fake) {
+          return {
+            normalTopic: String(raw.main),
+            fakeTopic: String(raw.fake)
+          };
+        }
+
+        if (raw.citizen && raw.fake) {
+          return {
+            normalTopic: String(raw.citizen),
+            fakeTopic: String(raw.fake)
+          };
+        }
+      }
+
+      const normalTopic = getTopicTextFromAny(raw) || "猫";
+      let fakeTopic = normalTopic;
+
+      if (topics.length >= 2) {
+        let guard = 0;
+        while (fakeTopic === normalTopic && guard < 30) {
+          const other = topics[Math.floor(Math.random() * topics.length)];
+          fakeTopic = getTopicTextFromAny(other) || normalTopic;
+          guard++;
+        }
+      }
+
+      if (fakeTopic === normalTopic) {
+        fakeTopic = normalTopic === "猫" ? "虎" : "猫";
+      }
+
+      return { normalTopic, fakeTopic };
+    }
+  } catch (error) {
+    console.error("お題ペア作成失敗:", error);
+  }
+
+  return {
+    normalTopic: "猫",
+    fakeTopic: "虎"
+  };
+}
+
+function pickFakePlayer(players) {
+  const validPlayers = (players || []).filter((player) => player && player.uid);
+  if (validPlayers.length <= 0) return null;
+  return validPlayers[Math.floor(Math.random() * validPlayers.length)];
 }
 
 
@@ -298,12 +350,7 @@ function updateLobbyControlButtons() {
     if (isHost) {
       startBtn.style.display = "block";
       startBtn.disabled = !canStart;
-
-      if (canStart) {
-        startBtn.textContent = "ゲーム開始";
-      } else {
-        startBtn.textContent = "全員の準備待ち";
-      }
+      startBtn.textContent = canStart ? "ゲーム開始" : "全員の準備待ち";
     } else {
       startBtn.style.display = "none";
       startBtn.disabled = true;
@@ -345,7 +392,6 @@ function renderLobbyPlayers(players) {
     const isHost = player.uid === hostUid;
 
     let statusText = "";
-
     if (isHost) {
       statusText = "ホスト";
     } else if (player.ready) {
@@ -391,7 +437,7 @@ function startOnlineListeners() {
     }
   });
 
-  GameDB.listenRoom(currentRoomId, (room) => {
+  GameDB.listenRoom(currentRoomId, async (room) => {
     currentRoomData = room || null;
     updateLobbyControlButtons();
 
@@ -400,9 +446,24 @@ function startOnlineListeners() {
     if (room.status === "playing" && !onlineTopicHandled) {
       onlineTopicHandled = true;
 
-      currentTopic = room.topic || room.currentTopic || "？？？";
+      try {
+        const GameDB = requireGameDB();
 
-      showTopicScreen(currentTopic);
+        myAssignment = await GameDB.getMyAssignment(currentRoomId);
+
+        isFakeArtist = myAssignment.role === "fake" || myAssignment.isFake === true;
+        currentTopic = myAssignment.topic || "？？？";
+
+        showTopicScreen(currentTopic);
+      } catch (error) {
+        console.error("自分のお題取得失敗:", error);
+        alert(
+          "自分のお題の取得に失敗しました。\n\n" +
+          "少し待ってから最新版に更新してください。\n\n" +
+          "code: " + (error.code || "なし") + "\n" +
+          "message: " + (error.message || error)
+        );
+      }
     }
   });
 }
@@ -513,6 +574,8 @@ async function enterRoomFlow() {
     hasVoted = false;
     resultShown = false;
     latestVotes = [];
+    myAssignment = null;
+    isFakeArtist = false;
 
     showScreen("lobby-screen");
     startOnlineListeners();
@@ -538,6 +601,39 @@ function showTopicScreen(topic) {
     display.textContent = topicToText(topic);
   }
 
+  let roleBox = $("role-display-box");
+
+  if (!roleBox) {
+    const topicCard = document.querySelector("#topic-screen .topic-card");
+    roleBox = document.createElement("div");
+    roleBox.id = "role-display-box";
+    roleBox.className = "role-display-box";
+
+    if (topicCard) {
+      if (display) {
+        display.insertAdjacentElement("afterend", roleBox);
+      } else {
+        topicCard.appendChild(roleBox);
+      }
+    }
+  }
+
+  if (roleBox) {
+    if (isFakeArtist) {
+      roleBox.innerHTML = `
+        <strong>あなたはニセ絵師です</strong>
+        <p>他の人と少し違うお題です。バレないように描こう。</p>
+      `;
+      roleBox.classList.add("fake-role");
+    } else {
+      roleBox.innerHTML = `
+        <strong>あなたは市民絵師です</strong>
+        <p>みんなと同じお題です。ニセ絵師を探そう。</p>
+      `;
+      roleBox.classList.remove("fake-role");
+    }
+  }
+
   const badge = $("drawing-topic-badge");
   if (badge) {
     badge.textContent = "お題：" + topicToText(topic);
@@ -548,7 +644,7 @@ function showTopicScreen(topic) {
 
 
 // ==============================
-// キャンバス初期化
+// キャンバス
 // ==============================
 function initCanvas() {
   if (!canvas || !ctx) return;
@@ -585,11 +681,8 @@ function redrawCanvas() {
     ctx.beginPath();
 
     stroke.points.forEach((point, index) => {
-      if (index === 0) {
-        ctx.moveTo(point.x, point.y);
-      } else {
-        ctx.lineTo(point.x, point.y);
-      }
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
     });
 
     ctx.stroke();
@@ -623,7 +716,6 @@ function startDrawing(event) {
   if (!canvas || !ctx) return;
 
   event.preventDefault();
-
   isDrawing = true;
 
   const point = getCanvasPoint(event);
@@ -733,7 +825,6 @@ function getCanvasImage() {
 
   tempCtx.fillStyle = "#ffffff";
   tempCtx.fillRect(0, 0, exportSize, exportSize);
-
   tempCtx.drawImage(canvas, 0, 0, exportSize, exportSize);
 
   const imageDataUrl = tempCanvas.toDataURL("image/jpeg", 0.55);
@@ -770,7 +861,6 @@ function startFirstDrawing() {
   if (finishBtn) finishBtn.textContent = "この段階を完了";
 
   showScreen("drawing-screen");
-
   startDrawingTimer(FIRST_DRAW_SECONDS);
 }
 
@@ -794,7 +884,6 @@ function startSecondDrawing() {
   if (finishBtn) finishBtn.textContent = "完成";
 
   showScreen("drawing-screen");
-
   startDrawingTimer(SECOND_DRAW_SECONDS);
 }
 
@@ -847,15 +936,11 @@ async function forceFinishCurrentDrawingPhase() {
 
   if (drawingPhase === 1) {
     midImageDataUrl = image;
-
     await saveDrawingOnline("mid", midImageDataUrl);
-
     showMidReview();
   } else {
     finalImageDataUrl = image;
-
     await saveDrawingOnline("final", finalImageDataUrl);
-
     showFinalReview();
   }
 }
@@ -888,7 +973,6 @@ async function saveDrawingOnline(phase, imageDataUrl) {
 // ==============================
 function ensureReviewGalleryGrid() {
   let grid = $("review-gallery-grid");
-
   if (grid) return grid;
 
   const galleryCard = document.querySelector("#review-screen .gallery-card");
@@ -897,7 +981,6 @@ function ensureReviewGalleryGrid() {
   grid = document.createElement("div");
   grid.id = "review-gallery-grid";
   grid.className = "review-gallery-grid";
-
   galleryCard.insertAdjacentElement("afterend", grid);
 
   return grid;
@@ -984,9 +1067,7 @@ function showMidReview() {
   if (title) title.textContent = "途中経過を見せ合おう";
 
   const description = $("review-description");
-  if (description) {
-    description.textContent = "軽く話し合って、怪しい人を探しましょう。";
-  }
+  if (description) description.textContent = "軽く話し合って、怪しい人を探しましょう。";
 
   const timerLabel = $("review-timer-label");
   if (timerLabel) timerLabel.textContent = "途中討論";
@@ -1004,7 +1085,6 @@ function showMidReview() {
   }
 
   showScreen("review-screen");
-
   startDrawingGalleryListener("mid", "途中絵", midImageDataUrl);
 
   startReviewTimer(MID_DISCUSSION_SECONDS, () => {
@@ -1020,9 +1100,7 @@ function showFinalReview() {
   if (title) title.textContent = "完成した絵を見せ合おう";
 
   const description = $("review-description");
-  if (description) {
-    description.textContent = "最後の話し合いです。ニセ絵師を探しましょう。";
-  }
+  if (description) description.textContent = "最後の話し合いです。ニセ絵師を探しましょう。";
 
   const timerLabel = $("review-timer-label");
   if (timerLabel) timerLabel.textContent = "最終討論";
@@ -1040,7 +1118,6 @@ function showFinalReview() {
   }
 
   showScreen("review-screen");
-
   startDrawingGalleryListener("final", "完成絵", finalImageDataUrl);
 
   startReviewTimer(FINAL_DISCUSSION_SECONDS, () => {
@@ -1082,20 +1159,18 @@ function startReviewTimer(seconds, onFinish) {
 
 
 // ==============================
-// v617 投票・結果同期
+// 投票・結果同期 v617
 // ==============================
 function getValidVotingPlayers() {
   if (Array.isArray(currentPlayers) && currentPlayers.length > 0) {
     return currentPlayers.filter((player) => player && player.uid);
   }
-
   return [];
 }
 
 function getMyVote(votes) {
   const myUid = getMyUidSafe();
   if (!myUid) return null;
-
   return (votes || []).find((vote) => vote.uid === myUid) || null;
 }
 
@@ -1107,7 +1182,7 @@ function renderVoteWaiting(votes) {
   const voteCount = Array.isArray(votes) ? votes.length : 0;
   const playerCount = players.length;
 
-  let status = document.getElementById("vote-status-box");
+  let status = $("vote-status-box");
 
   if (!status) {
     status = document.createElement("div");
@@ -1139,11 +1214,8 @@ function renderVoteWaiting(votes) {
 function updateVoteButtonsDisabled() {
   document.querySelectorAll(".vote-btn").forEach((button) => {
     button.disabled = hasVoted || resultShown;
-    if (hasVoted) {
-      button.classList.add("vote-disabled");
-    } else {
-      button.classList.remove("vote-disabled");
-    }
+    if (hasVoted) button.classList.add("vote-disabled");
+    else button.classList.remove("vote-disabled");
   });
 }
 
@@ -1228,11 +1300,9 @@ function showVoteScreen() {
 
     const isMe = player.uid === myUid;
 
-    if (isMe) {
-      button.textContent = `${player.name || "名無し"}（自分）`;
-    } else {
-      button.textContent = player.name || "名無し";
-    }
+    button.textContent = isMe
+      ? `${player.name || "名無し"}（自分）`
+      : player.name || "名無し";
 
     button.addEventListener("click", async () => {
       await handleVote(player);
@@ -1269,7 +1339,6 @@ async function handleVote(votedPlayer) {
 
     hasVoted = true;
     updateVoteButtonsDisabled();
-
     renderVoteWaiting(latestVotes);
   } catch (error) {
     console.error("投票失敗:", error);
@@ -1283,7 +1352,6 @@ async function handleVote(votedPlayer) {
 
 function buildVoteResult(votes) {
   const players = getValidVotingPlayers();
-
   const resultMap = {};
 
   players.forEach((player) => {
@@ -1321,11 +1389,7 @@ function buildVoteResult(votes) {
   const maxCount = results.length > 0 ? results[0].count : 0;
   const topPlayers = results.filter((result) => result.count === maxCount && maxCount > 0);
 
-  return {
-    results,
-    topPlayers,
-    maxCount
-  };
+  return { results, topPlayers, maxCount };
 }
 
 function showSyncedResultScreen(votes) {
@@ -1343,8 +1407,8 @@ function showSyncedResultScreen(votes) {
   }
 
   const resultDisplay = $("result-display");
-
   const voteResult = buildVoteResult(votes || []);
+
   const results = voteResult.results;
   const topPlayers = voteResult.topPlayers;
 
@@ -1358,7 +1422,36 @@ function showSyncedResultScreen(votes) {
     topText = `同票：${topPlayers.map((player) => escapeHtml(player.name)).join("、")}`;
   }
 
+  const answer = currentRoomData && currentRoomData.answer ? currentRoomData.answer : null;
+  let answerHtml = "";
+
+  if (answer) {
+    const votedFake = topPlayers.some((player) => player.uid === answer.fakeUid);
+
+    if (votedFake) {
+      answerHtml = `
+        <div class="answer-box citizen-win">
+          <h3>市民絵師チームの勝利！</h3>
+          <p>ニセ絵師は ${escapeHtml(answer.fakeName || "名無し")} でした。</p>
+          <p>通常お題：${escapeHtml(answer.normalTopic || "？？？")}</p>
+          <p>ニセ絵師のお題：${escapeHtml(answer.fakeTopic || "？？？")}</p>
+        </div>
+      `;
+    } else {
+      answerHtml = `
+        <div class="answer-box fake-win">
+          <h3>ニセ絵師の勝利！</h3>
+          <p>ニセ絵師は ${escapeHtml(answer.fakeName || "名無し")} でした。</p>
+          <p>通常お題：${escapeHtml(answer.normalTopic || "？？？")}</p>
+          <p>ニセ絵師のお題：${escapeHtml(answer.fakeTopic || "？？？")}</p>
+        </div>
+      `;
+    }
+  }
+
   let resultHtml = `
+    ${answerHtml}
+
     <div class="result-message">
       <h3>${topText}</h3>
       <p>全員の投票が完了しました。</p>
@@ -1385,10 +1478,6 @@ function showSyncedResultScreen(votes) {
 
   resultHtml += `
     </div>
-
-    <p class="note">
-      ※v617では投票同期まで対応しました。ニセ絵師の正解判定は次の段階で追加します。
-    </p>
   `;
 
   if (resultDisplay) {
@@ -1431,6 +1520,10 @@ function backToTop() {
   currentRoomId = null;
   playerName = null;
   currentTopic = null;
+
+  myAssignment = null;
+  isFakeArtist = false;
+
   currentPlayers = [];
   currentRoomData = null;
   pendingAction = null;
@@ -1511,7 +1604,6 @@ function setupEvents() {
         const nextReady = !(me && me.ready);
 
         await GameDB.setReady(currentRoomId, nextReady);
-
         updateLobbyControlButtons();
       } catch (error) {
         console.error("準備OK失敗:", error);
@@ -1550,19 +1642,32 @@ function setupEvents() {
 
         const GameDB = requireGameDB();
 
-        const topic = pickRandomTopic();
+        const topicPair = pickTopicPair();
+        const fakePlayer = pickFakePlayer(currentPlayers);
 
-        if (!topic) {
+        if (!topicPair || !topicPair.normalTopic || !topicPair.fakeTopic) {
           alert("お題の取得に失敗しました。topics.jsを確認してください。");
           return;
         }
 
-        currentTopic = topic;
+        if (!fakePlayer) {
+          alert("ニセ絵師の選択に失敗しました。");
+          return;
+        }
+
         hasVoted = false;
         resultShown = false;
         latestVotes = [];
+        myAssignment = null;
+        isFakeArtist = false;
+        onlineTopicHandled = false;
 
-        await GameDB.startOnlineGame(currentRoomId, topic);
+        await GameDB.startOnlineGame(currentRoomId, {
+          normalTopic: topicPair.normalTopic,
+          fakeTopic: topicPair.fakeTopic,
+          fakeUid: fakePlayer.uid,
+          fakeName: fakePlayer.name || "名無し"
+        });
       } catch (error) {
         console.error("ゲーム開始失敗:", error);
         alert(
