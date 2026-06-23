@@ -274,6 +274,20 @@ async function setMyOffline(roomId) {
     console.warn("offline更新失敗:", error);
   }
 }
+// ==============================
+// v624 app.js 互換用 presence 関数
+// ==============================
+async function updatePresence(roomId) {
+  return updateMyPresence(roomId);
+}
+
+async function setPresence(roomId, online) {
+  if (online === false) {
+    return setMyOffline(roomId);
+  }
+
+  return updateMyPresence(roomId);
+}
 
 
 // ==============================
@@ -367,6 +381,70 @@ async function checkAndTransferHost(roomId) {
 
   return true;
 }
+// ==============================
+// v624 app.js 互換用 ホスト移譲関数
+// ==============================
+async function transferHost(roomId, newHostUid) {
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  if (!newHostUid) {
+    throw new Error("新しいホストUIDが空です");
+  }
+
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  const roomSnap = await roomRef.get();
+
+  if (!roomSnap.exists) {
+    throw new Error("部屋が存在しません");
+  }
+
+  const playersSnap = await roomRef.collection("players").get();
+
+  const players = [];
+  playersSnap.forEach((doc) => {
+    players.push({
+      uid: doc.id,
+      ...doc.data()
+    });
+  });
+
+  const nextHost = players.find((player) => player.uid === newHostUid);
+
+  if (!nextHost) {
+    throw new Error("新しいホスト候補が見つかりません");
+  }
+
+  // 自分が新ホスト候補のときだけ実行
+  if (uid !== newHostUid) {
+    console.log("自分は新ホスト候補ではないため移譲しません");
+    return false;
+  }
+
+  await roomRef.set(
+    {
+      hostUid: nextHost.uid,
+      hostName: nextHost.name || "名無し",
+      hostChangedAtMs: Date.now(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("ホストを移譲しました:", {
+    newHostUid: nextHost.uid,
+    newHostName: nextHost.name || "名無し"
+  });
+
+  return true;
+}
+
+const transferHostTo = transferHost;
+const updateHost = transferHost;
 
 
 // ==============================
@@ -1288,8 +1366,13 @@ window.GameDB = {
   resetRoomToLobby,
 
   updateMyPresence,
+  updatePresence,
+  setPresence,
   setMyOffline,
-  checkAndTransferHost
+  checkAndTransferHost,
+  transferHost,
+  transferHostTo,
+  updateHost
 };
 
 console.log("GameDB ready:", window.GameDB);
