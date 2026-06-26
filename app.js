@@ -2917,7 +2917,7 @@ function renderLastRoomBox() {
   box.className = "last-room-box";
 
   box.innerHTML = `
-    <strong>前回の部屋に戻る</strong>
+    <strong>前回遊んだ部屋があります</strong>
     <p>部屋コード: <span>${escapeHtml(data.roomId)}</span></p>
     <p>名前: <span>${escapeHtml(data.playerName)}</span></p>
     <div class="last-room-actions">
