@@ -2637,3 +2637,108 @@ input:focus {
   color: #ffffff !important;
   border-color: #7a1f1f !important;
 }
+/* v632 投票待ち表示改善 */
+.not-voted-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 2px solid #2b2118;
+  border-radius: 14px;
+  background: rgba(255, 248, 220, 0.96);
+  color: #2b2118;
+  text-align: center;
+}
+
+.not-voted-box strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.not-voted-box.all-voted {
+  background: #e7f8ee;
+  border-color: #2f9e44;
+}
+
+.not-voted-box.all-voted strong {
+  color: #2f9e44;
+}
+
+.not-voted-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.not-voted-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 2px solid #2b2118;
+  background: #ffffff;
+  color: #2b2118;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.not-voted-chip.online {
+  background: #e7f8ee;
+  border-color: #2f9e44;
+  color: #1f7a35;
+}
+
+.not-voted-chip.offline {
+  background: #fff0f0;
+  border-color: #e03131;
+  color: #a11919;
+}
+
+/* v632 結果コピー */
+.result-share-box {
+  margin: 18px auto 0;
+  padding: 14px;
+  max-width: 420px;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+  background: rgba(255, 248, 220, 0.98);
+  color: #2b2118;
+  box-shadow: 0 3px 0 rgba(43, 33, 24, 0.28);
+  text-align: center;
+}
+
+.result-share-box strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.result-share-box p {
+  margin: 5px 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#copy-result-btn {
+  margin-top: 8px;
+  width: auto;
+  min-width: 140px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.copy-result-message {
+  min-height: 20px;
+  margin-top: 8px !important;
+  color: #6c5ce7;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.copy-result-message.copied {
+  color: #2f9e44;
+}
