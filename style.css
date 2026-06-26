@@ -2422,3 +2422,35 @@ input:focus {
   background: #f1f3f5;
   border: 1px solid #adb5bd;
 }
+
+/* ==============================
+   v626 room code copy
+============================== */
+
+.room-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.copy-room-code-btn {
+  width: auto;
+  min-width: 72px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.copy-room-code-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  color: #6c5ce7;
+}
+
+.copy-room-code-message.copied {
+  color: #2f9e44;
+}
