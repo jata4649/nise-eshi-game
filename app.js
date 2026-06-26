@@ -8,6 +8,7 @@ function showVersionBadge() {
   if (oldBadge) oldBadge.remove();
 
   const badge = document.createElement("div");
+  const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV630";
   badge.id = "version-badge";
   badge.textContent = "v630";
   badge.style.position = "fixed";
@@ -2811,6 +2812,54 @@ async function copyRoomUrlToClipboard() {
       message.classList.remove("copied");
     }
   }
+}
+function saveLastRoomInfo(roomId, playerName) {
+  const normalizedRoomId = normalizeRoomInput(roomId);
+  const normalizedName = (playerName || "").trim();
+
+  if (!normalizedRoomId || !normalizedName) return;
+
+  const data = {
+    roomId: normalizedRoomId,
+    playerName: normalizedName,
+    savedAt: Date.now()
+  };
+
+  try {
+    localStorage.setItem(LAST_ROOM_STORAGE_KEY, JSON.stringify(data));
+    console.log("last room saved:", data);
+  } catch (error) {
+    console.warn("前回部屋情報の保存に失敗:", error);
+  }
+}
+
+function loadLastRoomInfo() {
+  try {
+    const raw = localStorage.getItem(LAST_ROOM_STORAGE_KEY);
+    if (!raw) return null;
+
+    const data = JSON.parse(raw);
+    if (!data || !data.roomId || !data.playerName) return null;
+
+    return {
+      roomId: normalizeRoomInput(data.roomId),
+      playerName: String(data.playerName || "").trim(),
+      savedAt: Number(data.savedAt || 0)
+    };
+  } catch (error) {
+    console.warn("前回部屋情報の読み込みに失敗:", error);
+    return null;
+  }
+}
+
+function clearLastRoomInfo() {
+  try {
+    localStorage.removeItem(LAST_ROOM_STORAGE_KEY);
+  } catch (error) {
+    console.warn("前回部屋情報の削除に失敗:", error);
+  }
+
+  renderLastRoomBox();
 }
 
 
