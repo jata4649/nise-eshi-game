@@ -1,4 +1,4 @@
-console.log("firebase.js version 630 loaded");
+console.log("firebase.js version 631 loaded");
 
 // ==============================
 // Firebase 設定
@@ -631,6 +631,173 @@ async function setReady(roomId, ready) {
     );
 
   console.log("準備状態更新:", cleanRoomId, uid, ready);
+}
+async function leaveRoom(roomId) {
+  await signIn();
+
+  const uid = getCurrentUid();
+
+  if (!uid) {
+    throw new Error("ログイン情報がありません");
+  }
+
+  const normalizedRoomId = normalizeRoomId(roomId);
+
+  if (!normalizedRoomId) {
+    throw new Error("部屋IDが不正です");
+  }
+
+  const roomRef = db.collection("rooms").doc(normalizedRoomId);
+  const playerRef = roomRef.collection("players").doc(uid);
+
+  const roomSnap = await roomRef.get();
+
+  if (!roomSnap.exists) {
+    console.log("退出対象の部屋はすでに存在しません:", normalizedRoomId);
+    return {
+      roomDeleted: true,
+      reason: "room_not_found"
+    };
+  }
+
+  const roomData = roomSnap.data() || {};
+  const oldHostUid = roomData.hostUid || null;
+
+  // 自分のプレイヤーデータを削除
+  try {
+    await playerRef.delete();
+  } catch (error) {
+    console.warn("プレイヤー削除に失敗しましたが続行します:", error);
+  }
+
+  // 残っているプレイヤーを取得
+  const playersSnap = await roomRef.collection("players").get();
+
+  const remainingPlayers = [];
+
+  playersSnap.forEach((doc) => {
+    const data = doc.data() || {};
+    remainingPlayers.push({
+      uid: doc.id,
+      ...data
+    });
+  });
+
+  // 残り0人なら部屋ごと削除
+  if (remainingPlayers.length === 0) {
+    async function deleteSubcollectionForLeaveRoom(collectionName) {
+      const snap = await roomRef.collection(collectionName).get();
+
+      if (snap.empty) return;
+
+      let batch = db.batch();
+      let count = 0;
+      const commits = [];
+
+      snap.forEach((doc) => {
+        batch.delete(doc.ref);
+        count += 1;
+
+        if (count >= 450) {
+          commits.push(batch.commit());
+          batch = db.batch();
+          count = 0;
+        }
+      });
+
+      if (count > 0) {
+        commits.push(batch.commit());
+      }
+
+      await Promise.all(commits);
+    }
+
+    try {
+      await deleteSubcollectionForLeaveRoom("players");
+      await deleteSubcollectionForLeaveRoom("assignments");
+      await deleteSubcollectionForLeaveRoom("drawings");
+      await deleteSubcollectionForLeaveRoom("votes");
+    } catch (error) {
+      console.warn("サブコレクション削除中に警告:", error);
+    }
+
+    await roomRef.delete();
+
+    console.log("最後の参加者が退出したため部屋を削除しました:", normalizedRoomId);
+
+    return {
+      roomDeleted: true,
+      remainingCount: 0,
+      hostTransferred: false
+    };
+  }
+
+  // ホストが退出した、または現在のhostUidが残存プレイヤーにいない場合は移譲
+  const oldHostStillExists = remainingPlayers.some((player) => player.uid === oldHostUid);
+  const shouldTransferHost = oldHostUid === uid || !oldHostStillExists;
+
+  const updateData = {
+    updatedAtMs: nowMs(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  if (shouldTransferHost) {
+    const nextHost = remainingPlayers
+      .slice()
+      .sort((a, b) => {
+        const aTime =
+          Number(a.joinedAtMs || 0) ||
+          Number(a.createdAtMs || 0) ||
+          Number(a.lastSeenAtMs || 0) ||
+          0;
+
+        const bTime =
+          Number(b.joinedAtMs || 0) ||
+          Number(b.createdAtMs || 0) ||
+          Number(b.lastSeenAtMs || 0) ||
+          0;
+
+        if (aTime !== bTime) return aTime - bTime;
+
+        return String(a.name || "").localeCompare(String(b.name || ""), "ja");
+      })[0];
+
+    if (nextHost && nextHost.uid) {
+      updateData.hostUid = nextHost.uid;
+      updateData.hostName = nextHost.name || "名無し";
+
+      try {
+        await roomRef.collection("players").doc(nextHost.uid).set({
+          ready: false,
+          updatedAtMs: nowMs(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } catch (error) {
+        console.warn("新ホストready更新失敗:", error);
+      }
+
+      console.log("退出によりホストを移譲しました:", {
+        oldHostUid,
+        newHostUid: nextHost.uid,
+        newHostName: nextHost.name || "名無し"
+      });
+    }
+  }
+
+  await roomRef.set(updateData, { merge: true });
+
+  console.log("部屋から退出しました:", {
+    roomId: normalizedRoomId,
+    uid,
+    remainingCount: remainingPlayers.length,
+    hostTransferred: shouldTransferHost
+  });
+
+  return {
+    roomDeleted: false,
+    remainingCount: remainingPlayers.length,
+    hostTransferred: shouldTransferHost
+  };
 }
 
 
@@ -1435,14 +1602,12 @@ window.GameDB = {
   createRoom,
   roomExists,
   joinRoom,
+  leaveRoom,
   setReady,
-
   listenPlayers,
   listenRoom,
-
   startGame,
   startOnlineGame,
-
   updateRoomPhase,
   setRunoff,
   setResult,
