@@ -2498,3 +2498,30 @@ input:focus {
 .force-vote-result-box button {
   margin-top: 8px;
 }
+
+/* v629 参加URL共有 */
+.room-share-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.copy-room-url-btn {
+  width: auto;
+  min-width: 150px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.room-url-notice {
+  margin: 14px auto 0;
+  padding: 10px 12px;
+  max-width: 360px;
+  border: 2px solid #6c5ce7;
+  border-radius: 14px;
+  background: #f3f0ff;
+  color: #32205f;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
