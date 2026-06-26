@@ -2544,6 +2544,51 @@ function resetLocalRoundStateForLobby() {
   if (reviewGrid) reviewGrid.remove();
 }
 
+// ==============================
+// v626 部屋コードコピー
+// ==============================
+async function copyRoomCodeToClipboard() {
+  const message = $("copy-room-code-message");
+
+  try {
+    const code = currentRoomId || (document.getElementById("room-id-display")?.textContent || "").trim();
+
+    if (!code || code === "----") {
+      if (message) message.textContent = "コピーする部屋コードがありません。";
+      return;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(code);
+    } else {
+      const tempInput = document.createElement("input");
+      tempInput.value = code;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand("copy");
+      tempInput.remove();
+    }
+
+    if (message) {
+      message.textContent = `部屋コード ${code} をコピーしました`;
+      message.classList.add("copied");
+
+      setTimeout(() => {
+        message.textContent = "";
+        message.classList.remove("copied");
+      }, 2500);
+    }
+  } catch (error) {
+    console.error("部屋コードコピー失敗:", error);
+
+    if (message) {
+      message.textContent = "コピーに失敗しました。長押しで選択してください。";
+      message.classList.remove("copied");
+    }
+  }
+}
+
+
 
 // ==============================
 // トップへ戻る
@@ -2618,6 +2663,12 @@ function setupEvents() {
       await enterRoomFlow();
       return;
     }
+
+    if (id === "copy-room-code-btn") {
+  await copyRoomCodeToClipboard();
+  return;
+    }
+
 
     if (id === "go-drawing-btn") {
       alert("全員同時に始まるので、自動で開始するまで待ってください。");
