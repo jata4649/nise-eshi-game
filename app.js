@@ -1,7 +1,7 @@
 console.log("app.js version 632 loaded");
 
 // ==============================
-// v624 バージョン表示
+// v632 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
