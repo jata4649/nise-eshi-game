@@ -125,6 +125,8 @@ let voteUnsubscribe = null;
 let hasVoted = false;
 let resultShown = false;
 let latestVotes = [];
+let latestResultData = null;
+
 
 let lastHandledPhaseKey = null;
 let lastScheduledHostPhaseKey = null;
@@ -2103,32 +2105,41 @@ function renderVoteWaiting(votes) {
     return player && player.uid && !votedUidSet.has(player.uid);
   });
 
-  const notVotedNames = notVotedPlayers.map((player) => {
-    const onlineMark = isPlayerOnline(player) ? "" : "（オフライン）";
-    return escapeHtml((player.name || "名無し") + onlineMark);
-  });
+  const notVotedItemsHtml = notVotedPlayers.map((player) => {
+  const online = isPlayerOnline(player);
+  const name = escapeHtml(player.name || "名無し");
+
+  return `
+    <span class="not-voted-chip ${online ? "online" : "offline"}">
+      ${name}${online ? "" : "（オフライン）"}
+    </span>
+  `;
+}).join("");
 
   const roundLabel = currentVoteRound === "main"
     ? "通常投票"
     : `再投票 ${currentRoomData && currentRoomData.runoffRound ? currentRoomData.runoffRound : ""}`;
 
-  let notVotedHtml = "";
+ let notVotedHtml = "";
 
-  if (notVotedNames.length > 0) {
-    notVotedHtml = `
-      <div class="not-voted-box">
-        <strong>未投票</strong>
-        <p>${notVotedNames.join("、")}</p>
+if (notVotedPlayers.length > 0) {
+  notVotedHtml = `
+    <div class="not-voted-box">
+      <strong>未投票の人</strong>
+      <div class="not-voted-chip-list">
+        ${notVotedItemsHtml}
       </div>
-    `;
-  } else {
-    notVotedHtml = `
-      <div class="not-voted-box all-voted">
-        <strong>全員投票済み</strong>
-        <p>結果を集計しています...</p>
-      </div>
-    `;
-  }
+    </div>
+  `;
+} else {
+  notVotedHtml = `
+    <div class="not-voted-box all-voted">
+      <strong>全員投票済み</strong>
+      <p>結果を集計しています...</p>
+    </div>
+  `;
+}
+
 
   if (myVote) {
     hasVoted = true;
@@ -2527,6 +2538,7 @@ function showSyncedResultScreen(resultData) {
   const resultDisplay = $("result-display");
 
   const data = resultData || {};
+  latestResultData = data;
   const results = Array.isArray(data.results) ? data.results : [];
   const topPlayers = Array.isArray(data.topPlayers) ? data.topPlayers : [];
   const answer = data.answer || (currentRoomData && currentRoomData.answer ? currentRoomData.answer : null);
@@ -2650,9 +2662,17 @@ function showSyncedResultScreen(resultData) {
     `;
   });
 
-  resultHtml += `
+ resultHtml += `
+    </div>
+
+    <div class="result-share-box">
+      <strong>結果を共有</strong>
+      <p>結果をコピーして、参加者に共有できます。</p>
+      <button id="copy-result-btn" class="small-btn" type="button">結果をコピー</button>
+      <p id="copy-result-message" class="copy-result-message"></p>
     </div>
   `;
+
 
   if (resultDisplay) {
     resultDisplay.innerHTML = resultHtml;
@@ -2708,6 +2728,8 @@ function resetLocalRoundStateForLobby() {
   hasVoted = false;
   resultShown = false;
   latestVotes = [];
+  latestResultData = null;
+
 
   lastHandledPhaseKey = null;
   lastScheduledHostPhaseKey = null;
@@ -2877,6 +2899,68 @@ async function copyRoomUrlToClipboard() {
     }
   }
 }
+
+function buildResultShareText(data) {
+  const resultData = data || latestResultData || {};
+  const answer = resultData.answer || {};
+  const topPlayers = Array.isArray(resultData.topPlayers) ? resultData.topPlayers : [];
+  const winner = resultData.winner || "unknown";
+
+  const fakeName = answer.fakeName || "名無し";
+  const normalTopic = answer.normalTopic || "？？？";
+  const fakeTopic = answer.fakeTopic || "？？？";
+
+  let winnerText = "不明";
+
+  if (winner === "citizen") {
+    winnerText = "市民絵師チーム";
+  } else if (winner === "fake") {
+    winnerText = "ニセ絵師";
+  }
+
+  const topText = topPlayers.length > 0
+    ? topPlayers.map((player) => player.name || "名無し").join("、")
+    : "なし";
+
+  return [
+    "ニセ絵師を探せ！結果",
+    `ニセ絵師: ${fakeName}`,
+    `通常お題: ${normalTopic}`,
+    `ニセ絵師のお題: ${fakeTopic}`,
+    `勝者: ${winnerText}`,
+    `一番疑われた人: ${topText}`
+  ].join("\n");
+}
+
+async function copyResultToClipboard() {
+  const message = $("copy-result-message");
+
+  try {
+    const text = buildResultShareText(latestResultData);
+
+    await writeTextToClipboard(text);
+
+    if (message) {
+      message.textContent = "結果をコピーしました";
+      message.classList.add("copied");
+
+      setTimeout(() => {
+        message.textContent = "";
+        message.classList.remove("copied");
+      }, 2500);
+    }
+
+    console.log("result copied:", text);
+  } catch (error) {
+    console.error("結果コピー失敗:", error);
+
+    if (message) {
+      message.textContent = "結果コピーに失敗しました。";
+      message.classList.remove("copied");
+    }
+  }
+}
+
 
 function applyRoomCodeFromUrl() {
   const params = new URLSearchParams(location.search);
@@ -3173,15 +3257,21 @@ function setupEvents() {
     }
 
     if (id === "copy-room-code-btn") {
-  await copyRoomCodeToClipboard();
-  return;
+      await copyRoomCodeToClipboard();
+      return;
     }
 
-  if (id === "copy-room-url-btn") {
-  await copyRoomUrlToClipboard();
-  return;
-}
+    if (id === "copy-room-url-btn") {
+     await copyRoomUrlToClipboard();
+     return;
+    }
 
+   if (id === "copy-result-btn") {
+     await copyResultToClipboard();
+     return;
+    }
+
+    
   if (id === "restore-last-room-btn") {
   await restoreLastRoomInfoToForm();
   return;
