@@ -2934,7 +2934,7 @@ function renderLastRoomBox() {
   }
 }
 
-function restoreLastRoomInfoToForm() {
+async function restoreLastRoomInfoToForm() {
   const data = loadLastRoomInfo();
 
   if (!data || !data.roomId || !data.playerName) {
@@ -2943,37 +2943,58 @@ function restoreLastRoomInfoToForm() {
     return;
   }
 
-  const roomInput = $("room-id-input") || $("join-room-id-input");
-  if (roomInput) {
-    roomInput.value = data.roomId;
-  }
+  try {
+    const GameDB = requireGameDB();
 
-  const nameInput = $("player-name-input");
-  if (nameInput) {
-    nameInput.value = data.playerName;
-  }
+    await GameDB.signIn();
 
-  showScreen("top-screen");
+    if (GameDB.roomExists) {
+      const exists = await GameDB.roomExists(data.roomId);
 
-  const noticeId = "last-room-restore-notice";
-  let notice = $(noticeId);
+      if (!exists) {
+        alert(
+          "前回の部屋は見つかりませんでした。\n\n" +
+          "部屋が終了したか、削除された可能性があります。"
+        );
 
-  if (!notice) {
-    const topScreen = $("top-screen");
-    if (topScreen) {
-      notice = document.createElement("p");
-      notice.id = noticeId;
-      notice.className = "room-url-notice";
-      topScreen.appendChild(notice);
+        clearLastRoomInfo();
+        return;
+      }
     }
-  }
 
-  if (notice) {
-    notice.textContent = `前回の部屋コード ${data.roomId} を入力しました。「部屋に参加する」を押してください。`;
-  }
+    currentRoomId = data.roomId;
+    playerName = data.playerName;
+    pendingAction = "join";
 
-  console.log("last room restored:", data);
+    const roomInput = $("room-id-input") || $("join-room-id-input");
+    if (roomInput) {
+      roomInput.value = data.roomId;
+    }
+
+    const nameInput = $("player-name-input");
+    if (nameInput) {
+      nameInput.value = data.playerName;
+    }
+
+    const display = $("room-id-display");
+    if (display) {
+      display.textContent = data.roomId;
+    }
+
+    showScreen("name-screen");
+
+    console.log("last room restored to name screen:", data);
+  } catch (error) {
+    console.error("前回の部屋へ戻る準備失敗:", error);
+
+    alert(
+      "前回の部屋へ戻る準備に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
+    );
+  }
 }
+
 
 
 // ==============================
@@ -3097,9 +3118,10 @@ function setupEvents() {
 }
 
   if (id === "restore-last-room-btn") {
-  restoreLastRoomInfoToForm();
+  await restoreLastRoomInfoToForm();
   return;
   }
+
 
   if (id === "clear-last-room-btn") {
   clearLastRoomInfo();
