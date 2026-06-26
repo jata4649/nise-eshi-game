@@ -1302,6 +1302,102 @@ async function resetRoomToLobby(roomId) {
   console.log("ロビーに戻しました:", cleanRoomId);
 }
 
+// ==============================
+// v627 部屋退出
+// ==============================
+async function leaveRoom(roomId) {
+  const uid = await signIn();
+  const cleanRoomId = normalizeRoomId(roomId);
+
+  if (!cleanRoomId) {
+    throw new Error("部屋IDが空です");
+  }
+
+  const roomRef = db.collection("rooms").doc(cleanRoomId);
+  const roomSnap = await roomRef.get();
+
+  if (!roomSnap.exists) {
+    return true;
+  }
+
+  const room = roomSnap.data();
+  const playerRef = roomRef.collection("players").doc(uid);
+
+  await playerRef.delete();
+
+  const playersSnap = await roomRef.collection("players").get();
+
+  if (playersSnap.empty) {
+    await deleteSubcollection(roomRef, "drawings");
+    await deleteSubcollection(roomRef, "votes");
+    await deleteSubcollection(roomRef, "assignments");
+    await roomRef.delete();
+
+    console.log("最後の参加者が退出したため部屋を削除:", cleanRoomId);
+    return true;
+  }
+
+  if (room.hostUid === uid) {
+    const remainingPlayers = [];
+
+    playersSnap.forEach((doc) => {
+      remainingPlayers.push({
+        uid: doc.id,
+        ...doc.data()
+      });
+    });
+
+    remainingPlayers.sort((a, b) => {
+      const joinedA = Number(a.joinedAtMs || 0);
+      const joinedB = Number(b.joinedAtMs || 0);
+
+      if (joinedA !== joinedB) return joinedA - joinedB;
+
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      return nameA.localeCompare(nameB, "ja");
+    });
+
+    const nextHost = remainingPlayers[0];
+
+    if (nextHost && nextHost.uid) {
+      await roomRef.set(
+        {
+          hostUid: nextHost.uid,
+          hostName: nextHost.name || "名無し",
+          hostChangedAtMs: Date.now(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+
+      await roomRef
+        .collection("players")
+        .doc(nextHost.uid)
+        .set(
+          {
+            isHost: true,
+            ready: true,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+
+      console.log("ホスト退出によりホスト移譲:", nextHost.uid);
+    }
+  }
+
+  await roomRef.set(
+    {
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  console.log("部屋から退出:", cleanRoomId, uid);
+  return true;
+}
+
 
 // ==============================
 // リスナー停止
@@ -1364,6 +1460,8 @@ window.GameDB = {
 
   finishRoom,
   resetRoomToLobby,
+  leaveRoom,
+
 
   updateMyPresence,
   updatePresence,
