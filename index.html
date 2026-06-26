@@ -267,8 +267,31 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <script src="topics.js?v=624fix1"></script>
-<script src="firebase.js?v=624fix1"></script>
-<script src="app.js?v=624fix1"></script>
+
+<script
+  src="firebase.js?v=624fix1"
+  onload="alert('firebase.js は読み込まれました')"
+  onerror="alert('firebase.js の読み込みに失敗しました')">
+</script>
+
+<script
+  src="app.js?v=624fix1"
+  onload="alert('app.js は読み込まれました')"
+  onerror="alert('app.js の読み込みに失敗しました')">
+</script>
+
+<script>
+setTimeout(function () {
+  alert(
+    "診断\n" +
+    "firebase: " + (typeof window.firebase) + "\n" +
+    "GameDB: " + (window.GameDB ? "OK" : "NG") + "\n" +
+    "signIn: " + (window.GameDB && window.GameDB.signIn ? "OK" : "NG") + "\n" +
+    "createRoom: " + (window.GameDB && window.GameDB.createRoom ? "OK" : "NG")
+  );
+}, 1000);
+</script>
+
 
 
 
