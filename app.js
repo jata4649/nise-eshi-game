@@ -3093,6 +3093,7 @@ function initApp() {
   setupEvents();
 
   showScreen("top-screen");
+  applyRoomCodeFromUrl();
 
   setTimeout(() => {
     updateLobbyControlButtons();
