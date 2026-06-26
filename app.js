@@ -1,4 +1,4 @@
-console.log("app.js version 630 loaded");
+console.log("app.js version 631 loaded");
 
 // ==============================
 // v624 バージョン表示
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v630";
+  badge.textContent = "v631";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "630");
+      url.searchParams.set("v", "631");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "630");
+      url.searchParams.set("v", "631");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -148,7 +148,7 @@ const LOGICAL_CANVAS_SIZE = 1000;
 const APP_PRESENCE_TIMEOUT_MS = 25000;
 const APP_PRESENCE_UPDATE_INTERVAL_MS = 10000;
 const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 12000;
-const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV630";
+const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV631";
 // v624 互換用：古い変数名が残っていても落ちないようにする
 const HOST_TRANSFER_CHECK_INTERVAL_MS = APP_HOST_TRANSFER_CHECK_INTERVAL_MS;
 
@@ -685,6 +685,65 @@ function pickFakePlayer(players) {
 // ==============================
 // ロビー制御
 // ==============================
+function ensureLobbyStatusInfo() {
+  let box = $("lobby-status-info");
+
+  if (box) return box;
+
+  const playersList = $("players-list");
+
+  if (!playersList) return null;
+
+  box = document.createElement("div");
+  box.id = "lobby-status-info";
+  box.className = "lobby-status-info";
+
+  playersList.insertAdjacentElement("beforebegin", box);
+
+  return box;
+}
+
+function renderLobbyStatusInfo() {
+  const box = ensureLobbyStatusInfo();
+
+  if (!box) return;
+
+  const count = Array.isArray(currentPlayers) ? currentPlayers.length : 0;
+  const host = currentRoomData && currentRoomData.hostUid
+    ? getPlayerByUid(currentRoomData.hostUid)
+    : null;
+
+  const hostName = host ? host.name || "名無し" : "未定";
+
+  let message = "";
+
+  if (count < 2) {
+    message = "2人以上で開始できます。参加者を待っています。";
+  } else if (isCurrentUserHost()) {
+    if (canHostStartGame()) {
+      message = "全員の準備ができました。ゲーム開始できます。";
+    } else {
+      message = "ホスト以外の全員が準備OKを押すと開始できます。";
+    }
+  } else {
+    const myUid = getMyUidSafe();
+    const me = currentPlayers.find((player) => player.uid === myUid);
+
+    if (me && me.ready) {
+      message = "準備OK済みです。ホストの開始を待っています。";
+    } else {
+      message = "準備ができたら「準備OK」を押してください。";
+    }
+  }
+
+  box.innerHTML = `
+    <strong>ロビー状況</strong>
+    <p>参加者：${count}人</p>
+    <p>ホスト：${escapeHtml(hostName)}</p>
+    <p>${escapeHtml(message)}</p>
+  `;
+  }
+
 function updateLobbyControlButtons() {
   const startBtn = $("start-game-btn");
   const readyBtn = $("ready-btn");
@@ -771,6 +830,7 @@ function renderLobbyPlayers(players) {
   });
 
   updateLobbyControlButtons();
+  renderLobbyStatusInfo();
 }
 
 
@@ -3011,13 +3071,17 @@ async function leaveCurrentRoomFlow() {
 
     if (!ok) return;
 
+    const leavingRoomId = currentRoomId;
+
     const GameDB = requireGameDB();
 
     if (GameDB.leaveRoom) {
-      await GameDB.leaveRoom(currentRoomId);
+      await GameDB.leaveRoom(leavingRoomId);
     } else if (GameDB.setPresence) {
-      await GameDB.setPresence(currentRoomId, false);
+      await GameDB.setPresence(leavingRoomId, false);
     }
+
+    console.log("退出完了:", leavingRoomId);
 
     backToTop();
   } catch (error) {
@@ -3029,6 +3093,7 @@ async function leaveCurrentRoomFlow() {
     );
   }
 }
+
 
 
 
@@ -3081,7 +3146,7 @@ function backToTop() {
 // イベント設定 v624 安定版
 // ==============================
 function setupEvents() {
-  console.log("setupEvents v630 start");
+  console.log("setupEvents v631 start");
 
   document.addEventListener("click", async (event) => {
     const target = event.target;
@@ -3268,7 +3333,7 @@ if (id === "force-vote-result-btn") {
     }
   });
 
-  console.log("setupEvents v630 complete");
+  console.log("setupEvents v631 complete");
 }
 
 
@@ -3277,7 +3342,7 @@ if (id === "force-vote-result-btn") {
 // 初期化 v624 安定版
 // ==============================
 function initApp() {
-  console.log("initApp v630 start");
+  console.log("initApp v631 start");
 
   showVersionBadge();
   showHardReloadButton();
@@ -3295,7 +3360,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v630 initialized");
+  console.log("app.js v631 initialized");
 }
 
 if (document.readyState === "loading") {
@@ -3306,14 +3371,14 @@ if (document.readyState === "loading") {
 // ==============================
 // v624 バージョンバッジ強制表示
 // ==============================
-(function forceVersionBadgeV630() {
+(function forceVersionBadgeV631() {
   function run() {
     const oldBadge = document.getElementById("version-badge");
     if (oldBadge) oldBadge.remove();
 
     const badge = document.createElement("div");
     badge.id = "version-badge";
-    badge.textContent = "v630";
+    badge.textContent = "v631";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
@@ -3328,7 +3393,7 @@ if (document.readyState === "loading") {
     badge.style.pointerEvents = "none";
     document.body.appendChild(badge);
 
-    console.log("v630 badge forced");
+    console.log("v631 badge forced");
   }
 
   if (document.readyState === "loading") {
