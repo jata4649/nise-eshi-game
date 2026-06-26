@@ -2692,25 +2692,18 @@ function resetLocalRoundStateForLobby() {
 // ==============================
 async function copyRoomCodeToClipboard() {
   const message = $("copy-room-code-message");
+  const code = getCurrentRoomCodeForShare();
+
+  if (!code) {
+    if (message) {
+      message.textContent = "コピーする部屋コードがありません。";
+      message.classList.remove("copied");
+    }
+    return;
+  }
 
   try {
-    const code = currentRoomId || (document.getElementById("room-id-display")?.textContent || "").trim();
-
-    if (!code || code === "----") {
-      if (message) message.textContent = "コピーする部屋コードがありません。";
-      return;
-    }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(code);
-    } else {
-      const tempInput = document.createElement("input");
-      tempInput.value = code;
-      document.body.appendChild(tempInput);
-      tempInput.select();
-      document.execCommand("copy");
-      tempInput.remove();
-    }
+    await writeTextToClipboard(code);
 
     if (message) {
       message.textContent = `部屋コード ${code} をコピーしました`;
@@ -2730,6 +2723,96 @@ async function copyRoomCodeToClipboard() {
     }
   }
 }
+
+function getCurrentRoomCodeForShare() {
+  const display = $("room-id-display");
+  const codeFromDisplay = display ? display.textContent.trim() : "";
+  const code = currentRoomId || codeFromDisplay;
+
+  if (!code || code === "----") return "";
+  return normalizeRoomInput(code);
+}
+
+function buildRoomShareUrl(roomId) {
+  const baseUrl = `${location.origin}${location.pathname}`;
+  const url = new URL(baseUrl);
+  url.searchParams.set("room", normalizeRoomInput(roomId));
+  return url.toString();
+}
+
+function buildRoomShareText(roomId) {
+  const normalizedRoomId = normalizeRoomInput(roomId);
+  const shareUrl = buildRoomShareUrl(normalizedRoomId);
+
+  return [
+    "ニセ絵師を探せ！",
+    `部屋コード: ${normalizedRoomId}`,
+    "参加はこちら:",
+    shareUrl
+  ].join("\n");
+}
+async function writeTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "readonly");
+  input.style.position = "fixed";
+  input.style.left = "-9999px";
+  input.style.top = "0";
+  document.body.appendChild(input);
+  input.focus();
+  input.select();
+
+  const success = document.execCommand("copy");
+  input.remove();
+
+  if (!success) {
+    throw new Error("document.execCommand copy failed");
+  }
+}
+async function copyRoomUrlToClipboard() {
+  const message = $("copy-room-code-message");
+  const code = getCurrentRoomCodeForShare();
+
+  if (!code) {
+    if (message) {
+      message.textContent = "コピーする参加URLがありません。";
+      message.classList.remove("copied");
+    }
+    return;
+  }
+
+  const shareText = buildRoomShareText(code);
+  const shareUrl = buildRoomShareUrl(code);
+
+  try {
+    await writeTextToClipboard(shareText);
+
+    if (message) {
+      message.textContent = "参加URLをコピーしました";
+      message.classList.add("copied");
+
+      setTimeout(() => {
+        message.textContent = "";
+        message.classList.remove("copied");
+      }, 2500);
+    }
+
+    console.log("room share url copied:", shareUrl);
+  } catch (error) {
+    console.error("参加URLコピー失敗:", error);
+
+    if (message) {
+      message.textContent = "コピーに失敗しました。URLを長押しでコピーしてください。";
+      message.classList.remove("copied");
+    }
+  }
+}
+
 
 // ==============================
 // v627 部屋退出
@@ -2844,6 +2927,11 @@ function setupEvents() {
   await copyRoomCodeToClipboard();
   return;
     }
+
+    if (id === "copy-room-url-btn") {
+  await copyRoomUrlToClipboard();
+  return;
+}
 
     if (id === "leave-room-btn") {
   await leaveCurrentRoomFlow();
