@@ -1,4 +1,4 @@
-console.log("firebase.js version 628 loaded");
+console.log("firebase.js version 629 loaded");
 
 // ==============================
 // Firebase 設定
