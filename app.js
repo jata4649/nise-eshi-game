@@ -2814,7 +2814,7 @@ function backToTop() {
 // イベント設定 v624 安定版
 // ==============================
 function setupEvents() {
-  console.log("setupEvents v627 start");
+  console.log("setupEvents v628 start");
 
   document.addEventListener("click", async (event) => {
     const target = event.target;
@@ -2985,7 +2985,7 @@ if (id === "force-vote-result-btn") {
     }
   });
 
-  console.log("setupEvents v627 complete");
+  console.log("setupEvents v628 complete");
 }
 
 
@@ -2994,7 +2994,7 @@ if (id === "force-vote-result-btn") {
 // 初期化 v624 安定版
 // ==============================
 function initApp() {
-  console.log("initApp v627 start");
+  console.log("initApp v628 start");
 
   showVersionBadge();
   showHardReloadButton();
@@ -3021,14 +3021,14 @@ if (document.readyState === "loading") {
 // ==============================
 // v624 バージョンバッジ強制表示
 // ==============================
-(function forceVersionBadgeV627() {
+(function forceVersionBadgeV628() {
   function run() {
     const oldBadge = document.getElementById("version-badge");
     if (oldBadge) oldBadge.remove();
 
     const badge = document.createElement("div");
     badge.id = "version-badge";
-    badge.textContent = "v627";
+    badge.textContent = "v628";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
@@ -3043,7 +3043,7 @@ if (document.readyState === "loading") {
     badge.style.pointerEvents = "none";
     document.body.appendChild(badge);
 
-    console.log("v627 badge forced");
+    console.log("v628 badge forced");
   }
 
   if (document.readyState === "loading") {
