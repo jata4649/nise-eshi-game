@@ -8,7 +8,6 @@ function showVersionBadge() {
   if (oldBadge) oldBadge.remove();
 
   const badge = document.createElement("div");
-  const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV630";
   badge.id = "version-badge";
   badge.textContent = "v630";
   badge.style.position = "fixed";
@@ -149,6 +148,7 @@ const LOGICAL_CANVAS_SIZE = 1000;
 const APP_PRESENCE_TIMEOUT_MS = 25000;
 const APP_PRESENCE_UPDATE_INTERVAL_MS = 10000;
 const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 12000;
+const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV630";
 // v624 互換用：古い変数名が残っていても落ちないようにする
 const HOST_TRANSFER_CHECK_INTERVAL_MS = APP_HOST_TRANSFER_CHECK_INTERVAL_MS;
 
@@ -1149,13 +1149,17 @@ async function enterRoomFlow() {
 
     await GameDB.signIn();
 
-    if (pendingAction === "create") {
-      await GameDB.createRoom(currentRoomId, playerName);
-    } else {
-      await GameDB.joinRoom(currentRoomId, playerName);
-    }
+   if (pendingAction === "create") {
+  await GameDB.createRoom(currentRoomId, playerName);
+} else {
+  await GameDB.joinRoom(currentRoomId, playerName);
+}
 
-    await updateMyPresenceOnline();
+// v630 前回の部屋情報を保存
+saveLastRoomInfo(currentRoomId, playerName);
+renderLastRoomBox();
+
+await updateMyPresenceOnline();
 
     const display = $("room-id-display");
     if (display) display.textContent = currentRoomId;
@@ -2671,7 +2675,7 @@ function resetLocalRoundStateForLobby() {
   const oldStatus = $("vote-status-box");
   if (oldStatus) oldStatus.remove();
 
-　const forceVoteResultBox = $("force-vote-result-box");
+  const forceVoteResultBox = $("force-vote-result-box");
 　if (forceVoteResultBox) forceVoteResultBox.remove();
 
   
@@ -2813,6 +2817,43 @@ async function copyRoomUrlToClipboard() {
     }
   }
 }
+
+function applyRoomCodeFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const roomParam = params.get("room");
+
+  if (!roomParam) return;
+
+  const normalizedRoomId = normalizeRoomInput(roomParam);
+  if (!normalizedRoomId) return;
+
+  const joinInput = $("join-room-id-input") || $("room-id-input");
+
+  if (joinInput) {
+    joinInput.value = normalizedRoomId;
+  }
+
+  const topNoticeId = "room-url-notice";
+  let notice = $(topNoticeId);
+
+  if (!notice) {
+    const topScreen = $("top-screen");
+    if (topScreen) {
+      notice = document.createElement("p");
+      notice.id = topNoticeId;
+      notice.className = "room-url-notice";
+      topScreen.appendChild(notice);
+    }
+  }
+
+  if (notice) {
+    notice.textContent = `参加URLから部屋コード ${normalizedRoomId} を読み込みました。`;
+  }
+
+  console.log("room code applied from URL:", normalizedRoomId);
+}
+
+
 function saveLastRoomInfo(roomId, playerName) {
   const normalizedRoomId = normalizeRoomInput(roomId);
   const normalizedName = (playerName || "").trim();
@@ -2860,6 +2901,78 @@ function clearLastRoomInfo() {
   }
 
   renderLastRoomBox();
+}
+function renderLastRoomBox() {
+  const topScreen = $("top-screen");
+  if (!topScreen) return;
+
+  const oldBox = $("last-room-box");
+  if (oldBox) oldBox.remove();
+
+  const data = loadLastRoomInfo();
+  if (!data || !data.roomId || !data.playerName) return;
+
+  const box = document.createElement("div");
+  box.id = "last-room-box";
+  box.className = "last-room-box";
+
+  box.innerHTML = `
+    <strong>前回の部屋に戻る</strong>
+    <p>部屋コード: <span>${escapeHtml(data.roomId)}</span></p>
+    <p>名前: <span>${escapeHtml(data.playerName)}</span></p>
+    <div class="last-room-actions">
+      <button id="restore-last-room-btn" class="small-btn" type="button">この部屋に戻る</button>
+      <button id="clear-last-room-btn" class="small-btn danger-btn" type="button">履歴を消す</button>
+    </div>
+  `;
+
+  const topCard = topScreen.querySelector(".card");
+  if (topCard) {
+    topCard.insertAdjacentElement("afterend", box);
+  } else {
+    topScreen.appendChild(box);
+  }
+}
+
+function restoreLastRoomInfoToForm() {
+  const data = loadLastRoomInfo();
+
+  if (!data || !data.roomId || !data.playerName) {
+    alert("前回の部屋情報がありません。");
+    renderLastRoomBox();
+    return;
+  }
+
+  const roomInput = $("room-id-input") || $("join-room-id-input");
+  if (roomInput) {
+    roomInput.value = data.roomId;
+  }
+
+  const nameInput = $("player-name-input");
+  if (nameInput) {
+    nameInput.value = data.playerName;
+  }
+
+  showScreen("top-screen");
+
+  const noticeId = "last-room-restore-notice";
+  let notice = $(noticeId);
+
+  if (!notice) {
+    const topScreen = $("top-screen");
+    if (topScreen) {
+      notice = document.createElement("p");
+      notice.id = noticeId;
+      notice.className = "room-url-notice";
+      topScreen.appendChild(notice);
+    }
+  }
+
+  if (notice) {
+    notice.textContent = `前回の部屋コード ${data.roomId} を入力しました。「部屋に参加する」を押してください。`;
+  }
+
+  console.log("last room restored:", data);
 }
 
 
@@ -2940,6 +3053,7 @@ function backToTop() {
   if (nameInput) nameInput.value = "";
 
   showScreen("top-screen");
+  renderLastRoomBox();
 }
 
 // ==============================
@@ -2977,10 +3091,20 @@ function setupEvents() {
   return;
     }
 
-    if (id === "copy-room-url-btn") {
+  if (id === "copy-room-url-btn") {
   await copyRoomUrlToClipboard();
   return;
 }
+
+  if (id === "restore-last-room-btn") {
+  restoreLastRoomInfoToForm();
+  return;
+  }
+
+  if (id === "clear-last-room-btn") {
+  clearLastRoomInfo();
+  return;
+  }
 
     if (id === "leave-room-btn") {
   await leaveCurrentRoomFlow();
@@ -3143,6 +3267,7 @@ function initApp() {
 
   showScreen("top-screen");
   applyRoomCodeFromUrl();
+  renderLastRoomBox();
 
   setTimeout(() => {
     updateLobbyControlButtons();
