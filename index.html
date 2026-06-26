@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ニセ絵師を探せ</title>
-  <link rel="stylesheet" href="style.css?v=628">
+  <link rel="stylesheet" href="style.css?v=629">
 </head>
 <body>
 
@@ -84,18 +84,21 @@
       <div class="card">
         <h2>ロビー</h2>
 
-        <div class="room-code-box">
+       <div class="room-code-box">
   <p>部屋コード</p>
 
   <div class="room-code-row">
     <div id="room-id-display" class="room-code">----</div>
-    <button id="copy-room-code-btn" class="small-btn copy-room-code-btn" type="button">
-      コピー
-    </button>
+    <button id="copy-room-code-btn" class="small-btn copy-room-code-btn" type="button">コードコピー</button>
+  </div>
+
+  <div class="room-share-row">
+    <button id="copy-room-url-btn" class="small-btn copy-room-url-btn" type="button">参加URLをコピー</button>
   </div>
 
   <p id="copy-room-code-message" class="copy-room-code-message"></p>
 </div>
+
 
 
         <div class="mini-flow">
@@ -276,9 +279,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
-<script src="topics.js?v=628"></script>
-<script src="firebase.js?v=628"></script>
-<script src="app.js?v=628"></script>
+<script src="topics.js?v=629"></script>
+<script src="firebase.js?v=629"></script>
+<script src="app.js?v=629"></script>
 
 
 
