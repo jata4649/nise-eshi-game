@@ -2525,3 +2525,78 @@ input:focus {
   font-weight: 800;
   text-align: center;
 }
+/* v630fix 前回の部屋に戻る 視認性改善 */
+#top-screen #last-room-box,
+.last-room-box {
+  margin: 18px auto 0 !important;
+  padding: 16px 14px !important;
+  max-width: 420px !important;
+  border: 3px solid #2b2118 !important;
+  border-radius: 18px !important;
+  background: rgba(255, 248, 220, 0.98) !important;
+  color: #2b2118 !important;
+  box-shadow: 0 4px 0 rgba(43, 33, 24, 0.45) !important;
+  text-align: center !important;
+  text-shadow: none !important;
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+#top-screen #last-room-box strong,
+.last-room-box strong {
+  display: block !important;
+  margin-bottom: 10px !important;
+  font-size: 17px !important;
+  font-weight: 900 !important;
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+#top-screen #last-room-box p,
+.last-room-box p {
+  margin: 6px 0 !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+#top-screen #last-room-box span,
+.last-room-box span {
+  display: inline-block !important;
+  padding: 2px 7px !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #6c5ce7 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.last-room-actions {
+  margin-top: 12px !important;
+  display: flex !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.last-room-actions .small-btn {
+  width: auto !important;
+  min-width: 140px !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  border-radius: 12px !important;
+}
+
+#restore-last-room-btn {
+  background: #ffffff !important;
+  color: #2b2118 !important;
+  border: 2px solid #2b2118 !important;
+}
+
+#clear-last-room-btn {
+  background: #ff6b6b !important;
+  color: #ffffff !important;
+  border: 2px solid #7a1f1f !important;
+}
