@@ -1,4 +1,4 @@
-console.log("firebase.js version 624 loaded");
+console.log("firebase.js version 624fix1 loaded");
 
 // ==============================
 // Firebase 設定
@@ -47,7 +47,7 @@ let unsubscribeVotes = null;
 // ==============================
 // v624 オンライン判定
 // ==============================
-const PRESENCE_TIMEOUT_MS = 25000;
+const FIREBASE_PRESENCE_TIMEOUT_MS = 25000;
 
 function nowMs() {
   return Date.now();
@@ -55,9 +55,12 @@ function nowMs() {
 
 function isPlayerOnline(player) {
   if (!player) return false;
+
   const lastSeenAtMs = Number(player.lastSeenAtMs || 0);
+
   if (!lastSeenAtMs) return false;
-  return nowMs() - lastSeenAtMs <= PRESENCE_TIMEOUT_MS;
+
+  return nowMs() - lastSeenAtMs <= FIREBASE_PRESENCE_TIMEOUT_MS;
 }
 
 
@@ -108,6 +111,7 @@ function topicValueToText(value) {
     for (const key of keys) {
       if (value[key] != null) {
         const text = topicValueToText(value[key]);
+
         if (text && text !== "[object Object]") {
           return text;
         }
@@ -115,8 +119,10 @@ function topicValueToText(value) {
     }
 
     const values = Object.values(value);
+
     for (const item of values) {
       const text = topicValueToText(item);
+
       if (text && text !== "[object Object]") {
         return text;
       }
@@ -136,7 +142,7 @@ function getCurrentUid() {
   return auth.currentUser ? auth.currentUser.uid : null;
 }
 
- function signIn() {
+async function signIn() {
   try {
     if (auth.currentUser) {
       console.log("すでにログイン済み:", auth.currentUser.uid);
@@ -152,7 +158,7 @@ function getCurrentUid() {
   }
 }
 
- function assertHost(roomRef) {
+async function assertHost(roomRef) {
   const uid = await signIn();
   const roomSnap = await roomRef.get();
 
@@ -172,7 +178,7 @@ function getCurrentUid() {
   };
 }
 
- function deleteSubcollection(roomRef, collectionName) {
+async function deleteSubcollection(roomRef, collectionName) {
   const snapshot = await roomRef.collection(collectionName).get();
 
   if (snapshot.empty) {
@@ -221,7 +227,7 @@ function createPhaseData(phase, durationSec, extraData) {
 // ==============================
 // v624 プレゼンス更新
 // ==============================
- function updateMyPresence(roomId) {
+async function updateMyPresence(roomId) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -247,7 +253,7 @@ function createPhaseData(phase, durationSec, extraData) {
   return true;
 }
 
- function setMyOffline(roomId) {
+async function setMyOffline(roomId) {
   const uid = getCurrentUid();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -274,9 +280,8 @@ function createPhaseData(phase, durationSec, extraData) {
     console.warn("offline更新失敗:", error);
   }
 }
-// ==============================
-// v624 app.js 互換用 presence 関数
-// ==============================
+
+// app.js 互換用
 async function updatePresence(roomId) {
   return updateMyPresence(roomId);
 }
@@ -292,8 +297,6 @@ async function setPresence(roomId, online) {
 
 // ==============================
 // v624 ホスト交代
-// ホストが一定時間オンライン更新していなければ、
-// オンライン中で参加が早い人を新ホストにする
 // ==============================
 async function checkAndTransferHost(roomId) {
   const uid = await signIn();
@@ -319,6 +322,7 @@ async function checkAndTransferHost(roomId) {
   const playersSnap = await roomRef.collection("players").get();
 
   const players = [];
+
   playersSnap.forEach((doc) => {
     players.push({
       id: doc.id,
@@ -357,8 +361,6 @@ async function checkAndTransferHost(roomId) {
 
   const nextHost = onlinePlayers[0];
 
-  // 自分が次ホスト候補でないなら何もしない
-  // 複数端末が同時に処理しても競合しにくくするため
   if (nextHost.uid !== uid) {
     return false;
   }
@@ -381,9 +383,8 @@ async function checkAndTransferHost(roomId) {
 
   return true;
 }
-// ==============================
-// v624 app.js 互換用 ホスト移譲関数
-// ==============================
+
+// app.js 互換用
 async function transferHost(roomId, newHostUid) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
@@ -406,6 +407,7 @@ async function transferHost(roomId, newHostUid) {
   const playersSnap = await roomRef.collection("players").get();
 
   const players = [];
+
   playersSnap.forEach((doc) => {
     players.push({
       uid: doc.id,
@@ -419,7 +421,6 @@ async function transferHost(roomId, newHostUid) {
     throw new Error("新しいホスト候補が見つかりません");
   }
 
-  // 自分が新ホスト候補のときだけ実行
   if (uid !== newHostUid) {
     console.log("自分は新ホスト候補ではないため移譲しません");
     return false;
@@ -528,7 +529,6 @@ async function roomExists(roomId) {
       }
 
       console.log("部屋確認リトライ:", i + 1, cleanRoomId);
-
       await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (error) {
       console.error("部屋存在チェック失敗:", error);
@@ -543,7 +543,6 @@ async function roomExists(roomId) {
 
 // ==============================
 // 部屋参加
-// ゲーム中・終了済みの部屋には途中参加できない
 // ==============================
 async function joinRoom(roomId, playerName) {
   const uid = await signIn();
@@ -662,6 +661,7 @@ function listenPlayers(roomId, callback) {
         snapshot.forEach((doc) => {
           players.push({
             id: doc.id,
+            uid: doc.id,
             ...doc.data()
           });
         });
@@ -752,8 +752,6 @@ async function getMyAssignment(roomId) {
 
 // ==============================
 // ゲーム開始
-// 古い絵・投票・役割を削除してから新ゲーム開始
-// Firestore phase 同期方式
 // ==============================
 async function startGame(roomId, gameSetup) {
   const uid = await signIn();
@@ -779,6 +777,7 @@ async function startGame(roomId, gameSetup) {
   const playersSnap = await roomRef.collection("players").get();
 
   const players = [];
+
   playersSnap.forEach((doc) => {
     const player = {
       uid: doc.id,
@@ -867,7 +866,7 @@ async function startGame(roomId, gameSetup) {
 
   await batch.commit();
 
-  console.log("ゲーム開始 v624:", {
+  console.log("ゲーム開始 v624fix1:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
@@ -882,7 +881,6 @@ const startOnlineGame = startGame;
 
 // ==============================
 // フェーズ更新
-// ホストだけが実行
 // ==============================
 async function updateRoomPhase(roomId, phase, durationSec, extraData) {
   const cleanRoomId = normalizeRoomId(roomId);
@@ -1075,9 +1073,6 @@ function listenDrawings(roomId, phase, callback) {
 
 // ==============================
 // 投票を保存
-// voteRoundごとに保存
-// main, runoff_1, runoff_2 ...
-// 自分投票も可能
 // ==============================
 async function saveVote(roomId, votedPlayer, voteRound) {
   const uid = await signIn();
@@ -1139,7 +1134,6 @@ async function saveVote(roomId, votedPlayer, voteRound) {
 
 // ==============================
 // 投票を監視
-// voteRound指定可能
 // ==============================
 function listenVotes(roomId, voteRound, callback) {
   const cleanRoomId = normalizeRoomId(roomId);
@@ -1182,7 +1176,10 @@ function listenVotes(roomId, voteRound, callback) {
         });
 
         console.log("votes更新:", round, votes);
-        if (typeof cb === "function") cb(votes);
+
+        if (typeof cb === "function") {
+          cb(votes);
+        }
       },
       (error) => {
         console.error("votes監視エラー:", error);
@@ -1241,9 +1238,8 @@ async function finishRoom(roomId) {
 
 // ==============================
 // もう一度遊ぶ
-// ホストだけがロビーに戻せる
 // ==============================
- function resetRoomToLobby(roomId) {
+async function resetRoomToLobby(roomId) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
@@ -1262,7 +1258,11 @@ async function finishRoom(roomId) {
   const batch = db.batch();
 
   playersSnap.forEach((doc) => {
-    const player = doc.data();
+    const player = {
+      uid: doc.id,
+      ...doc.data()
+    };
+
     const isHost = player.uid === room.hostUid || doc.id === room.hostUid;
 
     batch.set(
