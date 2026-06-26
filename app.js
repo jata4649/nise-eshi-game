@@ -1,4 +1,4 @@
-console.log("app.js version 627 loaded");
+console.log("app.js version 628 loaded");
 
 // ==============================
 // v624 バージョン表示
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v627";
+  badge.textContent = "v628";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "627");
+      url.searchParams.set("v", "628");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "627");
+      url.searchParams.set("v", "628");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -1877,6 +1877,143 @@ function getMyVote(votes) {
   return (votes || []).find((vote) => vote.uid === myUid) || null;
 }
 
+// ==============================
+// v628 オフライン未投票者除外集計
+// ==============================
+function getVoteStatusInfo(votes) {
+  const players = getValidVotingPlayers();
+  const voteList = Array.isArray(votes) ? votes : [];
+  const votedUidSet = new Set(voteList.map((vote) => vote.uid));
+
+  const notVotedPlayers = players.filter((player) => {
+    return player && player.uid && !votedUidSet.has(player.uid);
+  });
+
+  const onlinePlayers = players.filter((player) => isPlayerOnline(player));
+  const offlineNotVotedPlayers = notVotedPlayers.filter((player) => !isPlayerOnline(player));
+
+  const onlineVoted = onlinePlayers.every((player) => votedUidSet.has(player.uid));
+
+  return {
+    players,
+    voteList,
+    votedUidSet,
+    notVotedPlayers,
+    onlinePlayers,
+    offlineNotVotedPlayers,
+    onlineVoted
+  };
+}
+
+function ensureForceVoteResultBox() {
+  let box = $("force-vote-result-box");
+
+  if (box) return box;
+
+  const voteList = $("vote-list");
+
+  if (!voteList) return null;
+
+  box = document.createElement("div");
+  box.id = "force-vote-result-box";
+  box.className = "force-vote-result-box";
+
+  voteList.insertAdjacentElement("beforebegin", box);
+
+  return box;
+}
+
+function renderForceVoteResultBox(votes) {
+  const oldBox = $("force-vote-result-box");
+
+  const info = getVoteStatusInfo(votes);
+
+  if (
+    !isCurrentUserHost() ||
+    !currentRoomData ||
+    !(currentRoomData.phase === "voting" || currentRoomData.phase === "runoffVoting") ||
+    !info.onlineVoted ||
+    info.offlineNotVotedPlayers.length <= 0 ||
+    resultShown
+  ) {
+    if (oldBox) oldBox.remove();
+    return;
+  }
+
+  const box = ensureForceVoteResultBox();
+
+  if (!box) return;
+
+  const offlineNames = info.offlineNotVotedPlayers
+    .map((player) => escapeHtml(player.name || "名無し"))
+    .join("、");
+
+  box.innerHTML = `
+    <strong>オフラインの未投票者がいます</strong>
+    <p>${offlineNames}</p>
+    <p>オンラインの参加者は全員投票済みです。</p>
+    <button id="force-vote-result-btn" class="small-btn danger-btn" type="button">
+      オフラインを除いて集計
+    </button>
+  `;
+}
+
+async function forceDecideVotesWithoutOfflinePlayers() {
+  try {
+    if (!isCurrentUserHost()) {
+      alert("この操作ができるのはホストだけです。");
+      return;
+    }
+
+    if (!currentRoomData) {
+      alert("部屋情報がありません。");
+      return;
+    }
+
+    if (!(currentRoomData.phase === "voting" || currentRoomData.phase === "runoffVoting")) {
+      alert("現在は投票フェーズではありません。");
+      return;
+    }
+
+    const info = getVoteStatusInfo(latestVotes);
+
+    if (!info.onlineVoted) {
+      alert("オンラインの参加者の投票がまだ完了していません。");
+      return;
+    }
+
+    if (info.offlineNotVotedPlayers.length <= 0) {
+      alert("除外できるオフライン未投票者はいません。");
+      return;
+    }
+
+    const ok = confirm("オフラインの未投票者を除いて集計しますか？");
+
+    if (!ok) return;
+
+    const onlineUidSet = new Set(info.onlinePlayers.map((player) => player.uid));
+
+    const onlineVotes = info.voteList.filter((vote) => {
+      return onlineUidSet.has(vote.uid);
+    });
+
+    const round = currentRoomData.voteRound || currentVoteRound || "main";
+
+    if (processedVoteRounds.has(round + "_forced")) return;
+    processedVoteRounds.add(round + "_forced");
+
+    await decideOutcomeAsHost(onlineVotes, round);
+  } catch (error) {
+    console.error("強制集計失敗:", error);
+    alert(
+      "強制集計に失敗しました。\n\n" +
+      "code: " + (error.code || "なし") + "\n" +
+      "message: " + (error.message || error)
+    );
+  }
+}
+
+
 function renderVoteWaiting(votes) {
   const voteList = $("vote-list");
   if (!voteList) return;
@@ -1946,6 +2083,8 @@ function renderVoteWaiting(votes) {
   }
 
   updateVoteButtonsDisabled();
+  renderForceVoteResultBox(votes);
+
 }
 
 function updateVoteButtonsDisabled() {
@@ -2531,6 +2670,10 @@ function resetLocalRoundStateForLobby() {
   const oldStatus = $("vote-status-box");
   if (oldStatus) oldStatus.remove();
 
+　const forceVoteResultBox = $("force-vote-result-box");
+　if (forceVoteResultBox) forceVoteResultBox.remove();
+
+  
   const oldReplay = $("replay-box");
   if (oldReplay) oldReplay.remove();
 
@@ -2707,6 +2850,10 @@ function setupEvents() {
   return;
     }
 
+if (id === "force-vote-result-btn") {
+  await forceDecideVotesWithoutOfflinePlayers();
+  return;
+}
 
 
     if (id === "go-drawing-btn") {
@@ -2863,7 +3010,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v627 initialized");
+  console.log("app.js v628 initialized");
 }
 
 if (document.readyState === "loading") {
