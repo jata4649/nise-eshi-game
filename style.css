@@ -2469,3 +2469,32 @@ input:focus {
   text-align: center;
 }
 
+/* ==============================
+   v628 force vote result
+============================== */
+
+.force-vote-result-box {
+  margin: 12px 0;
+  padding: 12px;
+  border: 2px solid #e03131;
+  border-radius: 14px;
+  background: #fff0f0;
+  color: #4a1c1c;
+  text-align: center;
+}
+
+.force-vote-result-box strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.force-vote-result-box p {
+  margin: 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.force-vote-result-box button {
+  margin-top: 8px;
+}
