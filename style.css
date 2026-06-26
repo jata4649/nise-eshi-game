@@ -2600,3 +2600,40 @@ input:focus {
   color: #ffffff !important;
   border: 2px solid #7a1f1f !important;
 }
+/* v631 ロビー状況表示 */
+.lobby-status-info {
+  margin: 12px auto 14px;
+  padding: 12px 14px;
+  max-width: 420px;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+  background: rgba(255, 248, 220, 0.96);
+  color: #2b2118;
+  box-shadow: 0 3px 0 rgba(43, 33, 24, 0.28);
+  text-align: center;
+}
+
+.lobby-status-info strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.lobby-status-info p {
+  margin: 4px 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* v631 退出ボタン */
+#leave-room-btn {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.danger-btn {
+  background: #ff6b6b !important;
+  color: #ffffff !important;
+  border-color: #7a1f1f !important;
+}
