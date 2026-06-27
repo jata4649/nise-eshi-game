@@ -995,16 +995,25 @@ function startOnlineListeners() {
   }
 
   startPresenceHeartbeat();
-  startHostTransferMonitor();
   updateMyPresenceOnline();
 
+  // v632fix2
+  // 自動ホスト移譲は、スマホの一時的なオフライン誤判定で
+  // 参加者が勝手にホストになる原因になるため停止。
+  // ホスト移譲は firebase.js の leaveRoom()、つまり「退出する」を押した時だけ行う。
+  /*
+  startHostTransferMonitor();
+  */
 
   GameDB.listenPlayers(currentRoomId, (players) => {
     currentPlayers = players || [];
 
     renderLobbyPlayers(currentPlayers);
     updateLobbyControlButtons();
-    checkAndTransferHostIfNeeded();
+
+    // v632fix2
+    // 自動ホスト移譲は停止。
+    // checkAndTransferHostIfNeeded();
 
     if (
       currentRoomData &&
@@ -1018,7 +1027,10 @@ function startOnlineListeners() {
   GameDB.listenRoom(currentRoomId, async (room) => {
     currentRoomData = room || null;
     updateLobbyControlButtons();
-    checkAndTransferHostIfNeeded();
+
+    // v632fix2
+    // 自動ホスト移譲は停止。
+    // checkAndTransferHostIfNeeded();
 
     if (!room) return;
 
