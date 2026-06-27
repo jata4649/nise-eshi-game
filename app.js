@@ -2627,10 +2627,13 @@ function showSyncedResultScreen(resultData) {
     }
   }
 
+  const playerTopicsHtml = renderResultPlayerTopicsHtml(data);
+  
   let resultHtml = `
     ${answerHtml}
     ${reasonHtml}
-
+    ${playerTopicsHtml}
+    
     <div class="result-message">
       <h3>${topText}</h3>
       <p>全員の投票が完了しました。</p>
@@ -2900,6 +2903,105 @@ async function copyRoomUrlToClipboard() {
   }
 }
 
+function getResultPlayerTopicList(data) {
+  const resultData = data || latestResultData || {};
+  const answer = resultData.answer || {};
+
+  const fakeUid = answer.fakeUid || "";
+  const normalTopic = answer.normalTopic || "？？？";
+  const fakeTopic = answer.fakeTopic || "？？？";
+
+  const playerMap = new Map();
+
+  function addPlayer(player) {
+    if (!player || !player.uid) return;
+
+    if (!playerMap.has(player.uid)) {
+      playerMap.set(player.uid, {
+        uid: player.uid,
+        name: player.name || "名無し"
+      });
+    }
+  }
+
+  // 現在の参加者
+  if (Array.isArray(currentPlayers)) {
+    currentPlayers.forEach(addPlayer);
+  }
+
+  // 投票結果に含まれるプレイヤー
+  if (Array.isArray(resultData.results)) {
+    resultData.results.forEach(addPlayer);
+  }
+
+  // 最多票プレイヤー
+  if (Array.isArray(resultData.topPlayers)) {
+    resultData.topPlayers.forEach(addPlayer);
+  }
+
+  const players = Array.from(playerMap.values());
+
+  players.sort((a, b) => {
+    const aIsFake = a.uid === fakeUid ? 1 : 0;
+    const bIsFake = b.uid === fakeUid ? 1 : 0;
+
+    if (aIsFake !== bIsFake) {
+      return bIsFake - aIsFake;
+    }
+
+    return String(a.name || "").localeCompare(String(b.name || ""), "ja");
+  });
+
+  return players.map((player) => {
+    const isFake = player.uid === fakeUid;
+
+    return {
+      uid: player.uid,
+      name: player.name || "名無し",
+      isFake,
+      roleLabel: isFake ? "ニセ絵師" : "市民絵師",
+      topicLabel: isFake ? "ニセ絵師のお題" : "通常お題",
+      topic: isFake ? fakeTopic : normalTopic
+    };
+  });
+}
+
+function renderResultPlayerTopicsHtml(data) {
+  const list = getResultPlayerTopicList(data);
+
+  if (!list || list.length === 0) {
+    return "";
+  }
+
+  let html = `
+    <div class="result-player-topics-box">
+      <strong>各プレイヤーのお題</strong>
+      <div class="result-player-topics-list">
+  `;
+
+  list.forEach((item) => {
+    html += `
+      <div class="result-player-topic-item ${item.isFake ? "fake" : "normal"}">
+        <div class="result-player-topic-name">
+          ${escapeHtml(item.name)}
+          <span>${escapeHtml(item.roleLabel)}</span>
+        </div>
+        <div class="result-player-topic-word">
+          ${escapeHtml(item.topicLabel)}：<strong>${escapeHtml(item.topic)}</strong>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
+
 function buildResultShareText(data) {
   const resultData = data || latestResultData || {};
   const answer = resultData.answer || {};
@@ -2922,13 +3024,20 @@ function buildResultShareText(data) {
     ? topPlayers.map((player) => player.name || "名無し").join("、")
     : "なし";
 
+  const playerTopicLines = getResultPlayerTopicList(resultData).map((item) => {
+    return `- ${item.name}: ${item.topicLabel}「${item.topic}」`;
+  });
+
   return [
     "ニセ絵師を探せ！結果",
     `ニセ絵師: ${fakeName}`,
     `通常お題: ${normalTopic}`,
     `ニセ絵師のお題: ${fakeTopic}`,
     `勝者: ${winnerText}`,
-    `一番疑われた人: ${topText}`
+    `一番疑われた人: ${topText}`,
+    "",
+    "各プレイヤーのお題:",
+    ...playerTopicLines
   ].join("\n");
 }
 
