@@ -47,7 +47,7 @@ let unsubscribeVotes = null;
 // ==============================
 // v632 オンライン判定
 // ==============================
-const FIREBASE_PRESENCE_TIMEOUT_MS = 25000;
+const FIREBASE_PRESENCE_TIMEOUT_MS = 90000;
 
 function nowMs() {
   return Date.now();
