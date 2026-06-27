@@ -147,9 +147,9 @@ const RUNOFF_DISCUSSION_SECONDS = 60;
 const RUNOFF_LIMIT = 2;
 const LOGICAL_CANVAS_SIZE = 1000;
 
-const APP_PRESENCE_TIMEOUT_MS = 25000;
-const APP_PRESENCE_UPDATE_INTERVAL_MS = 10000;
-const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 12000;
+const APP_PRESENCE_TIMEOUT_MS = 90000;
+const APP_PRESENCE_UPDATE_INTERVAL_MS = 15000;
+const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 20000;
 const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV632";
 // v624 互換用：古い変数名が残っていても落ちないようにする
 const HOST_TRANSFER_CHECK_INTERVAL_MS = APP_HOST_TRANSFER_CHECK_INTERVAL_MS;
@@ -255,6 +255,7 @@ function canHostStartGame() {
   if (currentPlayers.length < 2) return false;
   return areAllGuestsReady();
 }
+
 
 function getPlayerByUid(uid) {
   return currentPlayers.find((player) => player.uid === uid) || null;
@@ -995,6 +996,8 @@ function startOnlineListeners() {
 
   startPresenceHeartbeat();
   startHostTransferMonitor();
+  updateMyPresenceOnline();
+
 
   GameDB.listenPlayers(currentRoomId, (players) => {
     currentPlayers = players || [];
