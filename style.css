@@ -2742,3 +2742,90 @@ input:focus {
 .copy-result-message.copied {
   color: #2f9e44;
 }
+
+/* v632 各プレイヤーのお題表示 */
+.result-player-topics-box {
+  margin: 16px auto;
+  padding: 14px;
+  max-width: 520px;
+  border: 2px solid #2b2118;
+  border-radius: 16px;
+  background: rgba(255, 248, 220, 0.98);
+  color: #2b2118;
+  box-shadow: 0 3px 0 rgba(43, 33, 24, 0.28);
+  text-align: center;
+}
+
+.result-player-topics-box > strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.result-player-topics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.result-player-topic-item {
+  padding: 10px 12px;
+  border: 2px solid #2b2118;
+  border-radius: 14px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.result-player-topic-item.fake {
+  background: #fff0f0;
+  border-color: #e03131;
+}
+
+.result-player-topic-item.normal {
+  background: #f3f8ff;
+  border-color: #4dabf7;
+}
+
+.result-player-topic-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 900;
+  color: #2b2118;
+}
+
+.result-player-topic-name span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #2b2118;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.result-player-topic-item.fake .result-player-topic-name span {
+  background: #e03131;
+}
+
+.result-player-topic-item.normal .result-player-topic-name span {
+  background: #1971c2;
+}
+
+.result-player-topic-word {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #2b2118;
+}
+
+.result-player-topic-word strong {
+  font-size: 15px;
+  color: #6c5ce7;
+}
