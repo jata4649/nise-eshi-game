@@ -45,7 +45,7 @@ let unsubscribeVotes = null;
 
 
 // ==============================
-// v624 オンライン判定
+// v632 オンライン判定
 // ==============================
 const FIREBASE_PRESENCE_TIMEOUT_MS = 25000;
 
@@ -951,14 +951,13 @@ async function startGame(roomId, gameSetup) {
       ...doc.data()
     };
 
-    if (isPlayerOnline(player)) {
-      players.push(player);
-    }
+    players.push(player);
   });
 
   if (players.length < 2) {
-    throw new Error("オンラインの参加者が2人以上で開始できます");
+    throw new Error("2人以上で開始できます");
   }
+
 
   if (!gameSetup || !gameSetup.normalTopic || !gameSetup.fakeTopic || !gameSetup.fakeUid) {
     throw new Error("ゲーム設定が不正です");
@@ -1033,7 +1032,7 @@ async function startGame(roomId, gameSetup) {
 
   await batch.commit();
 
-  console.log("ゲーム開始 v624fix1:", {
+  console.log("ゲーム開始 v632:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
