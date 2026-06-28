@@ -1481,22 +1481,7 @@ async function resetRoomToLobby(roomId) {
   console.log("ロビーに戻しました:", cleanRoomId);
 }
 
-// ==============================
-// v627 部屋退出
-// ==============================
 
-  const cleanRoomId = normalizeRoomId(roomId);
-
-  if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
-  }
-
-  const roomRef = db.collection("rooms").doc(cleanRoomId);
-  const roomSnap = await roomRef.get();
-
-  if (!roomSnap.exists) {
-    return true;
-  }
 
   const room = roomSnap.data();
   const playerRef = roomRef.collection("players").doc(uid);
