@@ -2829,3 +2829,41 @@ input:focus {
   font-size: 15px;
   color: #6c5ce7;
 }
+/* v632fix3 結果画面：各プレイヤーのお題の文字色修正 */
+.result-player-topics-box,
+.result-player-topics-box * {
+  color: #2b2118;
+}
+
+.result-player-topics-box h3,
+.result-player-topics-title {
+  color: #1f160f;
+}
+
+.result-player-topic-item {
+  color: #2b2118;
+}
+
+.result-player-topic-name {
+  color: #1f160f;
+  font-weight: 900;
+}
+
+.result-player-topic-role,
+.result-player-topic-topic,
+.result-player-topic-label {
+  color: #3a2a1c;
+  font-weight: 800;
+}
+
+/* ニセ絵師側カード */
+.result-player-topic-item.fake,
+.result-player-topic-item.is-fake {
+  color: #2b2118;
+}
+
+/* 市民側カード */
+.result-player-topic-item.citizen,
+.result-player-topic-item.normal {
+  color: #2b2118;
+}
