@@ -130,6 +130,7 @@ let latestResultData = null;
 
 let lastHandledPhaseKey = null;
 let lastScheduledHostPhaseKey = null;
+let activeGameId = null; // v632fix7 再プレイ判定用
 let currentVoteRound = "main";
 let processedVoteRounds = new Set();
 
@@ -1161,28 +1162,46 @@ function startOnlineListeners() {
     }
   });
 
-  GameDB.listenRoom(currentRoomId, async (room) => {
-    currentRoomData = room || null;
-    updateLobbyControlButtons();
+GameDB.listenRoom(currentRoomId, async (room) => {
+  currentRoomData = room || null;
+  updateLobbyControlButtons();
 
-    // v632fix6
-    // 自動ホスト移譲は停止。
-    // checkAndTransferHostIfNeeded();
-
-    if (!room) return;
-
-    if (room.phase === "lobby" || room.status === "lobby") {
-      if (resultShown || lastHandledPhaseKey) {
-        resetLocalRoundStateForLobby();
-        showScreen("lobby-screen");
-        updateLobbyControlButtons();
-      }
-      return;
-    }
-
-    scheduleHostPhaseAdvance(room);
-    await handleRoomPhase(room);
+  // v632fix7 debug
+  console.log("listenRoom:", {
+    phase: room?.phase,
+    status: room?.status,
+    gameId: room?.gameId,
+    activeGameId,
+    phaseStartAtMs: room?.phaseStartAtMs,
+    phaseDurationSec: room?.phaseDurationSec,
+    isHost: isCurrentUserHost(),
+    hostUid: room?.hostUid,
+    myUid: getMyUidSafe()
   });
+
+  if (!room) return;
+
+  if (room.phase === "lobby" || room.status === "lobby") {
+    if (resultShown || lastHandledPhaseKey || activeGameId) {
+      resetLocalRoundStateForLobby();
+      showScreen("lobby-screen");
+      updateLobbyControlButtons();
+    }
+    return;
+  }
+
+  // v632fix7
+  // 再プレイ時、gameId が変わったら各端末のローカル状態を必ずリセットする
+  if (room.gameId && activeGameId && room.gameId !== activeGameId) {
+    resetLocalRoundStateForNewGame(room.gameId);
+  } else if (room.gameId && !activeGameId) {
+    activeGameId = room.gameId;
+  }
+
+  scheduleHostPhaseAdvance(room);
+  await handleRoomPhase(room);
+});
+
 }
 
 async function handleRoomPhase(room) {
@@ -2858,6 +2877,95 @@ function showSyncedResultScreen(resultData) {
 // ==============================
 // ロビー復帰用リセット
 // ==============================
+function resetLocalRoundStateForNewGame(gameId) {
+  console.log("新しいゲームを検知したためローカル状態をリセット:", {
+    oldGameId: activeGameId,
+    newGameId: gameId
+  });
+
+  cancelSyncedTimer();
+  clearHostPhaseTimer();
+
+  cancelAnimationFrame(timerAnimationId);
+  cancelAnimationFrame(reviewTimerAnimationId);
+
+  if (reviewGalleryUnsubscribe) {
+    try {
+      reviewGalleryUnsubscribe();
+    } catch (error) {
+      console.warn("ギャラリーリスナー停止失敗:", error);
+    }
+    reviewGalleryUnsubscribe = null;
+  }
+
+  if (voteUnsubscribe) {
+    try {
+      voteUnsubscribe();
+    } catch (error) {
+      console.warn("投票リスナー停止失敗:", error);
+    }
+    voteUnsubscribe = null;
+  }
+
+  currentTopic = null;
+  myAssignment = null;
+  isFakeArtist = false;
+
+  drawingPhase = 1;
+  phaseEnding = false;
+
+  midImageDataUrl = null;
+  finalImageDataUrl = null;
+
+  hasVoted = false;
+  resultShown = false;
+  latestVotes = [];
+  latestResultData = null;
+
+  lastHandledPhaseKey = null;
+  lastScheduledHostPhaseKey = null;
+  currentVoteRound = "main";
+  processedVoteRounds = new Set();
+
+  savedDrawingPhaseMap = {
+    mid: false,
+    final: false
+  };
+
+  strokes = [];
+  currentStroke = null;
+  isDrawing = false;
+
+  const voteList = $("vote-list");
+  if (voteList) voteList.innerHTML = "";
+
+  const resultDisplay = $("result-display");
+  if (resultDisplay) resultDisplay.innerHTML = "";
+
+  const voteGalleryBox = $("vote-gallery-box");
+  if (voteGalleryBox) voteGalleryBox.remove();
+
+  const oldStatus = $("vote-status-box");
+  if (oldStatus) oldStatus.remove();
+
+  const forceVoteResultBox = $("force-vote-result-box");
+  if (forceVoteResultBox) forceVoteResultBox.remove();
+
+  const oldReplay = $("replay-box");
+  if (oldReplay) oldReplay.remove();
+
+  const roleBox = $("role-display-box");
+  if (roleBox) roleBox.remove();
+
+  const syncBox = $("phase-sync-box");
+  if (syncBox) syncBox.remove();
+
+  const reviewGrid = $("review-gallery-grid");
+  if (reviewGrid) reviewGrid.remove();
+
+  activeGameId = gameId || null;
+}
+
 function resetLocalRoundStateForLobby() {
   cancelSyncedTimer();
   clearHostPhaseTimer();
@@ -2903,6 +3011,7 @@ function resetLocalRoundStateForLobby() {
 
   lastHandledPhaseKey = null;
   lastScheduledHostPhaseKey = null;
+  activeGameId = null;
   currentVoteRound = "main";
   processedVoteRounds = new Set();
 
