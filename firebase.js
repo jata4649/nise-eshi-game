@@ -1,4 +1,4 @@
-console.log("firebase.js version 632 loaded");
+console.log("firebase.js version 632fix5 loaded");
 
 // ==============================
 // Firebase 設定
@@ -1032,7 +1032,7 @@ async function startGame(roomId, gameSetup) {
 
   await batch.commit();
 
-  console.log("ゲーム開始 v632:", {
+  console.log("ゲーム開始 v632fix5:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
