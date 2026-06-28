@@ -2867,3 +2867,95 @@ input:focus {
 .result-player-topic-item.normal {
   color: #2b2118;
 }
+/* v632fix4 結果画面：各プレイヤーのお題 文字色修正 */
+.result-player-topics-box {
+  margin: 18px auto;
+  padding: 16px;
+  border-radius: 18px;
+  background: #fff6dc;
+  border: 3px solid #5a3b1f;
+  color: #2b2118 !important;
+}
+
+.result-player-topics-box > strong {
+  display: block;
+  margin-bottom: 14px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #2b2118 !important;
+}
+
+.result-player-topics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-player-topic-item {
+  padding: 14px;
+  border-radius: 14px;
+  background: #fffaf0;
+  border: 3px solid #8ac7ff;
+  color: #2b2118 !important;
+  text-align: left;
+}
+
+.result-player-topic-item.fake {
+  background: #fff1f1;
+  border-color: #e94b5f;
+  color: #2b2118 !important;
+}
+
+.result-player-topic-item.normal {
+  background: #f3fbff;
+  border-color: #8ac7ff;
+  color: #2b2118 !important;
+}
+
+.result-player-topic-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #1f160f !important;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.result-player-topic-name span {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e94b5f;
+  color: #ffffff !important;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.result-player-topic-item.normal .result-player-topic-name span {
+  background: #4aa3df;
+}
+
+.result-player-topic-word {
+  font-size: 15px;
+  font-weight: 800;
+  color: #3a2a1c !important;
+}
+
+.result-player-topic-word strong {
+  color: #2b2118 !important;
+  font-weight: 900;
+}
+
+/* 念のため、カード内の白文字を強制的に焦げ茶に */
+.result-player-topic-item div,
+.result-player-topic-item strong {
+  color: #2b2118 !important;
+}
+
+/* ただし役職バッジだけは白文字に戻す */
+.result-player-topic-name span {
+  color: #ffffff !important;
+}
