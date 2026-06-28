@@ -210,18 +210,29 @@ async function deleteSubcollection(roomRef, collectionName) {
 }
 
 function createPhaseData(phase, durationSec, extraData) {
+  const now = Date.now();
   const startDelayMs = 1200;
-  const phaseStartAtMs = Date.now() + startDelayMs;
+  const safeDurationSec = Number(durationSec || 0);
 
   return {
     phase: phase,
-    phaseStartAtMs: phaseStartAtMs,
-    phaseDurationSec: durationSec || 0,
+    status: phase === "lobby" ? "lobby" : "playing",
+
+    // クライアント側で計算しやすい数値ミリ秒
+    phaseStartAtMs: now + startDelayMs,
+    phaseDurationSec: safeDurationSec,
+
+    // 数値の更新時刻も持たせる
+    updatedAtMs: now,
+
+    // Firestore確認用
     phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+
     ...(extraData || {})
   };
 }
+
 
 
 // ==============================
