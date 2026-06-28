@@ -845,6 +845,7 @@ function cancelSyncedTimer() {
   syncedTimerAnimationId = null;
 }
 
+
 function getPhaseDurationSec(room) {
   const phase = room?.phase || "";
   const savedDuration = Number(room?.phaseDurationSec || 0);
@@ -879,6 +880,7 @@ function getPhaseDurationSec(room) {
 
   return 0;
 }
+
 
 function getPhaseEndMs(room) {
   const now = Date.now();
@@ -1015,8 +1017,10 @@ function clearHostPhaseTimer() {
 
 function scheduleHostPhaseAdvance(room) {
   if (!isCurrentUserHost()) return;
-  if (!room || room.status !== "playing") return;
+  if (!room) return;
 
+  // lobby / finished 系だけ止める。status が playing でなくても phase が進行中なら予約する。
+  if (room.status === "lobby" || room.phase === "lobby") return;
   const phase = room.phase || "lobby";
 
   if (
@@ -1036,19 +1040,38 @@ function scheduleHostPhaseAdvance(room) {
 
   clearHostPhaseTimer();
 
-  
+  const endMs = getPhaseEndMs(room);
+  const delay = Math.max(0, endMs - Date.now() + 500);
 
+  console.log("ホストフェーズ進行予約:", {
+    phase,
+    delay,
+    phaseStartAtMs: room.phaseStartAtMs,
+    phaseDurationSec: room.phaseDurationSec,
+    endMs,
+    now: Date.now(),
+    isHost: isCurrentUserHost()
+  });
 
   hostPhaseTimerId = setTimeout(async () => {
     try {
+      console.log("ホストフェーズ進行実行:", {
+        phase,
+        currentRoomId
+      });
+
       await advancePhaseAsHost(room);
     } catch (error) {
       console.error("フェーズ進行失敗:", error);
+      alert(
+        "フェーズ進行に失敗しました。\n\n" +
+        "code: " + (error.code || "なし") + "\n" +
+        "message: " + (error.message || error)
+      );
     }
   }, delay);
-
-  console.log("ホストフェーズ進行予約:", phase, delay);
 }
+
 
 async function advancePhaseAsHost(room) {
   if (!isCurrentUserHost()) return;
@@ -1452,8 +1475,23 @@ function showTopicScreen(topic, room) {
   showScreen("topic-screen");
 
   if (room) {
-    startSyncedCountdown(room, "phase-sync-time", "phase-sync-progress");
-  }
+  startSyncedCountdown(room, "phase-sync-time", "phase-sync-progress", async () => {
+    try {
+      // ホストだけが保険で次フェーズへ進める
+      if (!isCurrentUserHost()) return;
+
+      // すでに別フェーズへ進んでいたら何もしない
+      if (!currentRoomData || currentRoomData.phase !== "topic") return;
+
+      console.log("topicタイマー終了による保険フェーズ進行");
+
+      await advancePhaseAsHost(room);
+    } catch (error) {
+      console.error("topic保険フェーズ進行失敗:", error);
+    }
+  });
+}
+
 }
 
 
