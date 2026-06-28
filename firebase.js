@@ -1,4 +1,4 @@
-console.log("firebase.js version 632fix5 loaded");
+console.log("firebase.js version 632fix7 loaded");
 
 // ==============================
 // Firebase 設定
@@ -1054,7 +1054,7 @@ batch.set(
 
   await batch.commit();
 
-  console.log("ゲーム開始 v632fix5:", {
+  console.log("ゲーム開始 v632fix7:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
