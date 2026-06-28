@@ -2959,3 +2959,13 @@ input:focus {
 .result-player-topic-name span {
   color: #ffffff !important;
 }
+/* v632fix4 最終強制 */
+#result-screen .result-player-topics-box,
+#result-screen .result-player-topics-box div,
+#result-screen .result-player-topics-box strong {
+  color: #2b2118 !important;
+}
+
+#result-screen .result-player-topic-name span {
+  color: #ffffff !important;
+}
