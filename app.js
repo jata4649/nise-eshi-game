@@ -1,4 +1,4 @@
-console.log("app.js version 632fix6 loaded");
+console.log("app.js version 632fix7 loaded");
 
 // ==============================
 // v632 バージョン表示
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v632fix6";
+  badge.textContent = "v632fix7";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "632fix6");
+      url.searchParams.set("v", "632fix7");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "632fix6");
+      url.searchParams.set("v", "632fix7");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -151,7 +151,7 @@ const LOGICAL_CANVAS_SIZE = 1000;
 const APP_PRESENCE_TIMEOUT_MS = 90000;
 const APP_PRESENCE_UPDATE_INTERVAL_MS = 15000;
 const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 20000;
-const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV632fix6";
+const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV632fix7";
 // v624 互換用：古い変数名が残っていても落ちないようにする
 const HOST_TRANSFER_CHECK_INTERVAL_MS = APP_HOST_TRANSFER_CHECK_INTERVAL_MS;
 
@@ -1135,7 +1135,7 @@ function startOnlineListeners() {
   startPresenceHeartbeat();
   updateMyPresenceOnline();
 
-  // v632fix6
+  // v632fix7
   // 自動ホスト移譲は、スマホの一時的なオフライン誤判定で
   // 参加者が勝手にホストになる原因になるため停止。
   // ホスト移譲は firebase.js の leaveRoom()、つまり「退出する」を押した時だけ行う。
@@ -1149,7 +1149,7 @@ function startOnlineListeners() {
     renderLobbyPlayers(currentPlayers);
     updateLobbyControlButtons();
 
-    // v632fix6
+    // v632fix7
     // 自動ホスト移譲は停止。
     // checkAndTransferHostIfNeeded();
 
@@ -3615,7 +3615,7 @@ function backToTop() {
 // イベント設定 v624 安定版
 // ==============================
 function setupEvents() {
-  console.log("setupEvents v632fix6 start");
+  console.log("setupEvents v632fix7 start");
 
   document.addEventListener("click", async (event) => {
     const target = event.target;
@@ -3808,7 +3808,7 @@ if (id === "force-vote-result-btn") {
     }
   });
 
-  console.log("setupEvents v632fix6 complete");
+  console.log("setupEvents v632fix7 complete");
 }
 
 
@@ -3817,7 +3817,7 @@ if (id === "force-vote-result-btn") {
 // 初期化 v624 安定版
 // ==============================
 function initApp() {
-  console.log("initApp v632fix6 start");
+  console.log("initApp v632fix7 start");
 
   showVersionBadge();
   showHardReloadButton();
@@ -3835,7 +3835,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v632fix6 initialized");
+  console.log("app.js v632fix7 initialized");
 }
 
 if (document.readyState === "loading") {
@@ -3846,14 +3846,14 @@ if (document.readyState === "loading") {
 // ==============================
 // v624 バージョンバッジ強制表示
 // ==============================
-(function forceVersionBadgeV632fix6() {
+(function forceVersionBadgeV632fix7() {
   function run() {
     const oldBadge = document.getElementById("version-badge");
     if (oldBadge) oldBadge.remove();
 
     const badge = document.createElement("div");
     badge.id = "version-badge";
-    badge.textContent = "v632fix6";
+    badge.textContent = "v632fix7";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
@@ -3868,7 +3868,7 @@ if (document.readyState === "loading") {
     badge.style.pointerEvents = "none";
     document.body.appendChild(badge);
 
-    console.log("v632fix6 badge forced");
+    console.log("v632fix7 badge forced");
   }
 
   if (document.readyState === "loading") {
