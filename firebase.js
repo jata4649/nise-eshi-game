@@ -779,10 +779,14 @@ async function leaveRoom(roomId) {
 
       try {
         await roomRef.collection("players").doc(nextHost.uid).set({
-          ready: false,
-          updatedAtMs: nowMs(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+      isHost: true,
+      ready: true,
+      online: true,
+      lastSeenAtMs: nowMs(),
+      updatedAtMs: nowMs(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
       } catch (error) {
         console.warn("新ホストready更新失敗:", error);
       }
@@ -988,21 +992,28 @@ async function startGame(roomId, gameSetup) {
   await deleteSubcollection(roomRef, "votes");
   await deleteSubcollection(roomRef, "assignments");
 
-  const gameId = Date.now().toString();
+ const now = Date.now();
+const gameId = `${now}_${Math.random().toString(36).slice(2, 8)}`;
 
-  const batch = db.batch();
+const batch = db.batch();
 
-  batch.set(
-    roomRef,
-    {
-      status: "playing",
-      phase: "topic",
-      phaseStartAtMs: Date.now() + 1200,
-      phaseDurationSec: 5,
-      gameId: gameId,
-      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      finishedAt: null,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+batch.set(
+  roomRef,
+  {
+    status: "playing",
+    phase: "topic",
+    phaseStartAtMs: now + 1200,
+    phaseDurationSec: 5,
+    gameId: gameId,
+
+    startedAtMs: now,
+    updatedAtMs: now,
+
+    startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    finishedAt: null,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+
 
       voteRound: "main",
       runoffRound: 0,
@@ -1097,19 +1108,15 @@ async function setRunoff(roomId, candidates, round) {
   const runoffRound = Number(round || 1);
   const voteRound = "runoff_" + runoffRound;
 
-  await roomRef.set(
-    {
-      phase: "runoffDiscussion",
-      phaseStartAtMs: Date.now() + 1200,
-      phaseDurationSec: 60,
-      runoffRound: runoffRound,
-      voteRound: voteRound,
-      runoffCandidates: Array.isArray(candidates) ? candidates : [],
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    },
-    { merge: true }
+ await roomRef.set(
+  createPhaseData("runoffDiscussion", 60, {
+    runoffRound: runoffRound,
+    voteRound: voteRound,
+    runoffCandidates: Array.isArray(candidates) ? candidates : []
+  }),
+  { merge: true }
   );
+
 
   console.log("同票再議論へ:", {
     roomId: cleanRoomId,
@@ -1134,16 +1141,11 @@ async function setResult(roomId, resultData) {
   await assertHost(roomRef);
 
   await roomRef.set(
-    {
-      phase: "result",
-      phaseStartAtMs: Date.now() + 1200,
-      phaseDurationSec: 0,
-      resultData: resultData || null,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      phaseUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    },
-    { merge: true }
-  );
+  createPhaseData("result", 0, {
+    resultData: resultData || null
+  }),
+  { merge: true }
+);
 
   console.log("結果保存:", cleanRoomId, resultData);
 }
@@ -1482,8 +1484,7 @@ async function resetRoomToLobby(roomId) {
 // ==============================
 // v627 部屋退出
 // ==============================
-async function leaveRoom(roomId) {
-  const uid = await signIn();
+
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
