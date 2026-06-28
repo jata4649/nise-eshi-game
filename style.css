@@ -2969,3 +2969,160 @@ input:focus {
 #result-screen .result-player-topic-name span {
   color: #ffffff !important;
 }
+
+/* ==============================
+   v632fix5 結果画面 各プレイヤーのお題 文字色 最終修正
+============================== */
+
+/* 各プレイヤーのお題ボックス全体 */
+#result-display .result-player-topics-box,
+.result-card .result-player-topics-box,
+.result-showcase .result-player-topics-box,
+.result-player-topics-box {
+  margin: 18px auto !important;
+  padding: 16px !important;
+  border-radius: 18px !important;
+  background: #fff6dc !important;
+  border: 3px solid #5a3b1f !important;
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+/* 見出し「各プレイヤーのお題」 */
+#result-display .result-player-topics-box > strong,
+.result-card .result-player-topics-box > strong,
+.result-showcase .result-player-topics-box > strong,
+.result-player-topics-box > strong {
+  display: block !important;
+  margin-bottom: 14px !important;
+  text-align: center !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+/* リスト */
+#result-display .result-player-topics-list,
+.result-card .result-player-topics-list,
+.result-showcase .result-player-topics-list,
+.result-player-topics-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+/* 各プレイヤーのカード */
+#result-display .result-player-topic-item,
+.result-card .result-player-topic-item,
+.result-showcase .result-player-topic-item,
+.result-player-topic-item {
+  padding: 14px !important;
+  border-radius: 14px !important;
+  background: #fffaf0 !important;
+  border: 3px solid #8ac7ff !important;
+  color: #2b2118 !important;
+  text-align: left !important;
+  text-shadow: none !important;
+}
+
+/* ニセ絵師カード */
+#result-display .result-player-topic-item.fake,
+.result-card .result-player-topic-item.fake,
+.result-showcase .result-player-topic-item.fake,
+.result-player-topic-item.fake {
+  background: #fff1f1 !important;
+  border-color: #e94b5f !important;
+}
+
+/* 通常プレイヤーカード */
+#result-display .result-player-topic-item.normal,
+.result-card .result-player-topic-item.normal,
+.result-showcase .result-player-topic-item.normal,
+.result-player-topic-item.normal {
+  background: #f3fbff !important;
+  border-color: #8ac7ff !important;
+}
+
+/* プレイヤー名行 */
+#result-display .result-player-topic-name,
+.result-card .result-player-topic-name,
+.result-showcase .result-player-topic-name,
+.result-player-topic-name {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-bottom: 10px !important;
+  font-size: 17px !important;
+  font-weight: 900 !important;
+  color: #1f160f !important;
+  text-shadow: none !important;
+}
+
+/* 役職バッジ */
+#result-display .result-player-topic-name span,
+.result-card .result-player-topic-name span,
+.result-showcase .result-player-topic-name span,
+.result-player-topic-name span {
+  flex-shrink: 0 !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  background: #e94b5f !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-shadow: none !important;
+}
+
+/* 通常側バッジ */
+#result-display .result-player-topic-item.normal .result-player-topic-name span,
+.result-card .result-player-topic-item.normal .result-player-topic-name span,
+.result-showcase .result-player-topic-item.normal .result-player-topic-name span,
+.result-player-topic-item.normal .result-player-topic-name span {
+  background: #4aa3df !important;
+  color: #ffffff !important;
+}
+
+/* お題行 */
+#result-display .result-player-topic-word,
+.result-card .result-player-topic-word,
+.result-showcase .result-player-topic-word,
+.result-player-topic-word {
+  margin-top: 6px !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #3a2a1c !important;
+  text-shadow: none !important;
+}
+
+/* お題の太字部分 */
+#result-display .result-player-topic-word strong,
+.result-card .result-player-topic-word strong,
+.result-showcase .result-player-topic-word strong,
+.result-player-topic-word strong {
+  color: #2b2118 !important;
+  font-weight: 900 !important;
+  text-shadow: none !important;
+}
+
+/* 念押し：各プレイヤーのお題ボックス内は基本焦げ茶 */
+#result-display .result-player-topics-box div,
+#result-display .result-player-topics-box strong:not(.keep-white),
+#result-display .result-player-topics-box p,
+.result-card .result-player-topics-box div,
+.result-card .result-player-topics-box strong:not(.keep-white),
+.result-card .result-player-topics-box p,
+.result-showcase .result-player-topics-box div,
+.result-showcase .result-player-topics-box strong:not(.keep-white),
+.result-showcase .result-player-topics-box p {
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+/* ただし役職バッジだけは白文字 */
+#result-display .result-player-topic-name span,
+.result-card .result-player-topic-name span,
+.result-showcase .result-player-topic-name span {
+  color: #ffffff !important;
+}
