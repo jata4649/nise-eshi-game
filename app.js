@@ -198,18 +198,27 @@ function escapeHtml(text) {
 
 function requireGameDB() {
   if (!window.GameDB) {
+    console.error("GameDB is not loaded", {
+      firebaseExists: typeof window.firebase !== "undefined",
+      firebaseApps: window.firebase && window.firebase.apps ? window.firebase.apps.length : null,
+      GameDB: window.GameDB
+    });
+
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v625 で読み込まれているか\n" +
+      "1. firebase.js が v632fix7 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
-      "3. Firebase SDK が読み込まれているか"
+      "3. Firebase SDK v8 が読み込まれているか\n\n" +
+      "詳しくはブラウザのコンソールを確認してください。"
     );
+
     throw new Error("GameDB is not loaded");
   }
 
   return window.GameDB;
 }
+
 
 function createRoomId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
