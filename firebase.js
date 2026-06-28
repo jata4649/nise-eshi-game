@@ -1636,9 +1636,7 @@ window.GameDB = {
 
   finishRoom,
   resetRoomToLobby,
-  leaveRoom,
-
-
+ 
   updateMyPresence,
   updatePresence,
   setPresence,
