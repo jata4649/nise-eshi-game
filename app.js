@@ -857,18 +857,78 @@ function startSyncedCountdown(room, displayId, progressId, onEnd) {
   const display = $(displayId);
   const progress = $(progressId);
 
+  const phase = room?.phase || "";
+
+  let durationSec = Number(room?.phaseDurationSec || 0);
+
+  // durationSec が 0 / 未設定だった場合の保険
+  if (!durationSec || durationSec <= 0) {
+    if (phase === "topic") {
+      durationSec = typeof TOPIC_CONFIRM_SECONDS !== "undefined" ? TOPIC_CONFIRM_SECONDS : 5;
+    } else if (phase === "drawing1") {
+      durationSec = FIRST_DRAW_SECONDS;
+    } else if (phase === "midReview") {
+      durationSec = MID_DISCUSSION_SECONDS;
+    } else if (phase === "drawing2") {
+      durationSec = SECOND_DRAW_SECONDS;
+    } else if (phase === "finalReview") {
+      durationSec = FINAL_DISCUSSION_SECONDS;
+    } else {
+      durationSec = 5;
+    }
+  }
+
+  const durationMs = durationSec * 1000;
+  const now = Date.now();
+
+  let startMs = Number(room?.phaseStartAtMs || 0);
+
+  // phaseStartAtMs が無い場合の保険
+  if (!startMs) {
+    console.warn("phaseStartAtMs が無いため補正:", {
+      phase,
+      room
+    });
+    startMs = now + 800;
+  }
+
+  let endMs = startMs + durationMs;
+
+  // 開始時刻が古すぎて即0秒になる場合の保険
+  if (durationMs > 0 && now > endMs + 3000) {
+    console.warn("phaseStartAtMs が古すぎるため補正:", {
+      phase,
+      startMs,
+      durationSec,
+      now,
+      endMs,
+      room
+    });
+
+    startMs = now + 800;
+    endMs = startMs + durationMs;
+  }
+
   let ended = false;
 
-  function tick() {
-    const now = Date.now();
-    const startMs = Number(room.phaseStartAtMs || now);
-    const durationMs = Number(room.phaseDurationSec || 0) * 1000;
-    const endMs = startMs + durationMs;
+  console.log("startSyncedCountdown:", {
+    phase,
+    durationSec,
+    startMs,
+    endMs,
+    now: Date.now(),
+    remainingMs: endMs - Date.now(),
+    room
+  });
 
-    const remainMs = Math.max(0, endMs - now);
+  function tick() {
+    const current = Date.now();
+    const remainMs = Math.max(0, endMs - current);
     const remainSec = Math.ceil(remainMs / 1000);
 
-    if (display) display.textContent = String(remainSec);
+    if (display) {
+      display.textContent = String(remainSec);
+    }
 
     if (progress) {
       const ratio = durationMs > 0
@@ -881,7 +941,12 @@ function startSyncedCountdown(room, displayId, progressId, onEnd) {
     if (remainMs <= 0) {
       if (!ended) {
         ended = true;
-        if (typeof onEnd === "function") onEnd();
+
+        if (typeof onEnd === "function") {
+          Promise.resolve(onEnd()).catch((error) => {
+            console.error("同期タイマー終了処理失敗:", error);
+          });
+        }
       }
       return;
     }
@@ -922,8 +987,10 @@ function scheduleHostPhaseAdvance(room) {
 
   clearHostPhaseTimer();
 
-  const endMs = getPhaseEndMs(room);
-  const delay = Math.max(0, endMs - Date.now() + 500);
+  function getPhaseEndMs(room) {
+  ...
+　}
+
 
   hostPhaseTimerId = setTimeout(async () => {
     try {
