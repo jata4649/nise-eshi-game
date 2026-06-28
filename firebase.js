@@ -163,7 +163,7 @@ async function assertHost(roomRef) {
   const roomSnap = await roomRef.get();
 
   if (!roomSnap.exists) {
-    throw new Error("部屋が存在しません");
+    throw new Error("が存在しません");
   }
 
   const room = roomSnap.data();
@@ -243,7 +243,7 @@ async function updateMyPresence(roomId) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
+    throw new Error("IDが空です");
   }
 
   await db
@@ -314,7 +314,7 @@ async function checkAndTransferHost(roomId) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
+    throw new Error("IDが空です");
   }
 
   const roomRef = db.collection("rooms").doc(cleanRoomId);
@@ -401,7 +401,7 @@ async function transferHost(roomId, newHostUid) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
+    throw new Error("IDが空です");
   }
 
   if (!newHostUid) {
@@ -412,7 +412,7 @@ async function transferHost(roomId, newHostUid) {
   const roomSnap = await roomRef.get();
 
   if (!roomSnap.exists) {
-    throw new Error("部屋が存在しません");
+    throw new Error("が存在しません");
   }
 
   const playersSnap = await roomRef.collection("players").get();
@@ -460,14 +460,14 @@ const updateHost = transferHost;
 
 
 // ==============================
-// 部屋作成
+// 作成
 // ==============================
 async function createRoom(roomId, playerName) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
+    throw new Error("IDが空です");
   }
 
   const roomRef = db.collection("rooms").doc(cleanRoomId);
@@ -513,13 +513,13 @@ async function createRoom(roomId, playerName) {
 
   await batch.commit();
 
-  console.log("部屋作成成功:", cleanRoomId);
+  console.log("作成成功:", cleanRoomId);
   return cleanRoomId;
 }
 
 
 // ==============================
-// 部屋存在チェック
+// 存在チェック
 // ==============================
 async function roomExists(roomId) {
   const cleanRoomId = normalizeRoomId(roomId);
@@ -535,46 +535,46 @@ async function roomExists(roomId) {
       const snap = await db.collection("rooms").doc(cleanRoomId).get();
 
       if (snap.exists) {
-        console.log("部屋存在確認成功:", cleanRoomId);
+        console.log("存在確認成功:", cleanRoomId);
         return true;
       }
 
-      console.log("部屋確認リトライ:", i + 1, cleanRoomId);
+      console.log("確認リトライ:", i + 1, cleanRoomId);
       await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (error) {
-      console.error("部屋存在チェック失敗:", error);
+      console.error("存在チェック失敗:", error);
       throw error;
     }
   }
 
-  console.warn("部屋が見つかりません:", cleanRoomId);
+  console.warn("が見つかりません:", cleanRoomId);
   return false;
 }
 
 
 // ==============================
-// 部屋参加
+// 参加
 // ==============================
 async function joinRoom(roomId, playerName) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
+    throw new Error("IDが空です");
   }
 
   const roomRef = db.collection("rooms").doc(cleanRoomId);
   const roomSnap = await roomRef.get();
 
   if (!roomSnap.exists) {
-    throw new Error("部屋が存在しません");
+    throw new Error("が存在しません");
   }
 
   const room = roomSnap.data();
   const status = room.status || "lobby";
 
   if (status !== "lobby") {
-    throw new Error("この部屋はすでにゲーム中、または終了済みです。新しい部屋で参加してください。");
+    throw new Error("このはすでにゲーム中、または終了済みです。新しいで参加してください。");
   }
 
   const playerRef = roomRef.collection("players").doc(uid);
@@ -609,7 +609,7 @@ async function joinRoom(roomId, playerName) {
     { merge: true }
   );
 
-  console.log("部屋参加成功:", cleanRoomId, playerName);
+  console.log("参加成功:", cleanRoomId, playerName);
   return cleanRoomId;
 }
 
@@ -622,7 +622,7 @@ async function setReady(roomId, ready) {
   const cleanRoomId = normalizeRoomId(roomId);
 
   if (!cleanRoomId) {
-    throw new Error("部屋IDが空です");
+    throw new Error("IDが空です");
   }
 
   await db
@@ -655,7 +655,7 @@ async function leaveRoom(roomId) {
   const normalizedRoomId = normalizeRoomId(roomId);
 
   if (!normalizedRoomId) {
-    throw new Error("部屋IDが不正です");
+    throw new Error("IDが不正です");
   }
 
   const roomRef = db.collection("rooms").doc(normalizedRoomId);
@@ -664,7 +664,7 @@ async function leaveRoom(roomId) {
   const roomSnap = await roomRef.get();
 
   if (!roomSnap.exists) {
-    console.log("退出対象の部屋はすでに存在しません:", normalizedRoomId);
+    console.log("退出対象のはすでに存在しません:", normalizedRoomId);
     return {
       roomDeleted: true,
       reason: "room_not_found"
@@ -694,7 +694,7 @@ async function leaveRoom(roomId) {
     });
   });
 
-  // 残り0人なら部屋ごと削除
+  // 残り0人ならごと削除
   if (remainingPlayers.length === 0) {
     async function deleteSubcollectionForLeaveRoom(collectionName) {
       const snap = await roomRef.collection(collectionName).get();
@@ -734,7 +734,7 @@ async function leaveRoom(roomId) {
 
     await roomRef.delete();
 
-    console.log("最後の参加者が退出したため部屋を削除しました:", normalizedRoomId);
+    console.log("最後の参加者が退出したためを削除しました:", normalizedRoomId);
 
     return {
       roomDeleted: true,
@@ -1575,6 +1575,7 @@ async function resetRoomToLobby(roomId) {
   console.log("部屋から退出:", cleanRoomId, uid);
   return true;
 }
+
 
 
 // ==============================
