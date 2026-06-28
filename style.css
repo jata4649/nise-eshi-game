@@ -3126,3 +3126,59 @@ input:focus {
 .result-showcase .result-player-topic-name span {
   color: #ffffff !important;
 }
+/* ==============================
+   v632fix6 結果画面：明るいカードの文字色固定
+============================== */
+
+#result-display .answer-box,
+.result-card .answer-box,
+.answer-box {
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+#result-display .answer-box *,
+.result-card .answer-box *,
+.answer-box * {
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+/* ニセ絵師バッジだけは白文字を維持 */
+#result-display .answer-box .fake-artist-label,
+#result-display .answer-box .fake-badge-inline,
+.result-card .answer-box .fake-artist-label,
+.result-card .answer-box .fake-badge-inline,
+.answer-box .fake-artist-label,
+.answer-box .fake-badge-inline {
+  color: #ffffff !important;
+}
+
+/* 各プレイヤーのお題カードも焦げ茶固定 */
+#result-display .result-player-topics-box,
+#result-display .result-player-topics-box *,
+.result-card .result-player-topics-box,
+.result-card .result-player-topics-box *,
+.result-player-topics-box,
+.result-player-topics-box * {
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
+
+/* 各プレイヤーのお題の役職バッジだけ白文字 */
+#result-display .result-player-topic-name span,
+.result-card .result-player-topic-name span,
+.result-player-topic-name span {
+  color: #ffffff !important;
+}
+
+/* 結果コピーカードも明るいので焦げ茶固定 */
+#result-display .result-share-box,
+#result-display .result-share-box *,
+.result-card .result-share-box,
+.result-card .result-share-box *,
+.result-share-box,
+.result-share-box * {
+  color: #2b2118 !important;
+  text-shadow: none !important;
+}
