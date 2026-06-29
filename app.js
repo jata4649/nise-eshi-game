@@ -3140,7 +3140,7 @@ function resetLocalRoundStateForLobby() {
   if (oldStatus) oldStatus.remove();
 
   const forceVoteResultBox = $("force-vote-result-box");
-　if (forceVoteResultBox) forceVoteResultBox.remove();
+  if (forceVoteResultBox) forceVoteResultBox.remove();
 
   
   const oldReplay = $("replay-box");
