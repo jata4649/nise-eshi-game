@@ -1,4 +1,4 @@
-console.log("firebase.js version 632fix8 loaded");
+console.log("firebase.js version 633 loaded");
 
 // ==============================
 // Firebase 設定
@@ -45,7 +45,7 @@ let unsubscribeVotes = null;
 
 
 // ==============================
-// v632 オンライン判定
+// v633 オンライン判定
 // ==============================
 const FIREBASE_PRESENCE_TIMEOUT_MS = 90000;
 
@@ -1054,7 +1054,7 @@ batch.set(
 
   await batch.commit();
 
-  console.log("ゲーム開始 v632fix8:", {
+  console.log("ゲーム開始 v633:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
