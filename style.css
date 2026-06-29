@@ -3182,3 +3182,12 @@ input:focus {
   color: #2b2118 !important;
   text-shadow: none !important;
 }
+<input id="player-name-input" type="text" placeholder="あなたの名前" maxlength="12">
+
+<div class="icon-select-box">
+  <h3>アイコンを選ぶ</h3>
+  <p class="icon-select-note">ロビーや投票画面に表示されます</p>
+  <div id="icon-select-grid" class="icon-select-grid"></div>
+</div>
+
+<button id="enter-room-btn" class="primary-btn">参加する</button>
