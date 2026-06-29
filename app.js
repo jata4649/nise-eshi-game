@@ -915,17 +915,23 @@ function renderLobbyPlayers(players) {
     const onlineLabel = online ? "オンライン" : "オフライン";
 
     item.innerHTML = `
-      <span class="player-name">
-        ${escapeHtml(player.name || "名無し")}
-        <span class="online-dot ${online ? "online" : "offline"}"></span>
-      </span>
-      <span class="player-status ${statusClass}">
-        ${statusText}
-      </span>
-      <span class="player-presence ${online ? "online" : "offline"}">
-        ${onlineLabel}
-      </span>
-    `;
+    <span class="player-main-info">
+    ${getPlayerIconHtml(player, "lobby-player-icon")}
+    <span class="player-name">
+      ${escapeHtml(player.name || "名無し")}
+      <span class="online-dot ${online ? "online" : "offline"}"></span>
+    </span>
+    </span>
+
+  <span class="player-status ${statusClass}">
+    ${statusText}
+  </span>
+
+  <span class="player-presence ${online ? "online" : "offline"}">
+    ${onlineLabel}
+  </span>
+`;
+
 
     playerList.appendChild(item);
   });
