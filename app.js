@@ -94,6 +94,7 @@ function showHardReloadButton() {
 let currentRoomId = null;
 let playerName = null;
 let currentTopic = null;
+let selectedIconId = "icon_01";
 
 let myAssignment = null;
 let isFakeArtist = false;
