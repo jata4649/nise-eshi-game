@@ -1,7 +1,7 @@
-console.log("app.js version 632fix8 loaded");
+console.log("app.js version 633 loaded");
 
 // ==============================
-// v632 バージョン表示
+// v633 バージョン表示
 // ==============================
 function showVersionBadge() {
   const oldBadge = document.getElementById("version-badge");
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v632fix8";
+  badge.textContent = "v633";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "632fix8");
+      url.searchParams.set("v", "633");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "632fix8");
+      url.searchParams.set("v", "633");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -131,7 +131,7 @@ let latestResultData = null;
 
 let lastHandledPhaseKey = null;
 let lastScheduledHostPhaseKey = null;
-let activeGameId = null; // v632fix8 再プレイ判定用
+let activeGameId = null; // v633 再プレイ判定用
 let currentVoteRound = "main";
 let processedVoteRounds = new Set();
 
@@ -152,7 +152,20 @@ const LOGICAL_CANVAS_SIZE = 1000;
 const APP_PRESENCE_TIMEOUT_MS = 90000;
 const APP_PRESENCE_UPDATE_INTERVAL_MS = 15000;
 const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 20000;
-const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV632fix8";
+const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV633";
+const PLAYER_ICONS = [
+  { id: "icon_01", src: "assets/icon/icon_01.jpg", label: "アイコン1" },
+  { id: "icon_02", src: "assets/icon/icon_02.jpg", label: "アイコン2" },
+  { id: "icon_03", src: "assets/icon/icon_03.jpg", label: "アイコン3" },
+  { id: "icon_04", src: "assets/icon/icon_04.jpg", label: "アイコン4" },
+  { id: "icon_05", src: "assets/icon/icon_05.jpg", label: "アイコン5" },
+  { id: "icon_06", src: "assets/icon/icon_06.jpg", label: "アイコン6" },
+  { id: "icon_07", src: "assets/icon/icon_07.jpg", label: "アイコン7" },
+  { id: "icon_08", src: "assets/icon/icon_08.jpg", label: "アイコン8" },
+  { id: "icon_09", src: "assets/icon/icon_09.jpg", label: "アイコン9" },
+  { id: "icon_10", src: "assets/icon/icon_10.jpg", label: "アイコン10" }
+];
+
 // v624 互換用：古い変数名が残っていても落ちないようにする
 const HOST_TRANSFER_CHECK_INTERVAL_MS = APP_HOST_TRANSFER_CHECK_INTERVAL_MS;
 
@@ -208,7 +221,7 @@ function requireGameDB() {
     alert(
       "通信機能の読み込みに失敗しました。\n\n" +
       "確認してください：\n" +
-      "1. firebase.js が v632fix8 で読み込まれているか\n" +
+      "1. firebase.js が v633 で読み込まれているか\n" +
       "2. index.html の script 順番が正しいか\n" +
       "3. Firebase SDK v8 が読み込まれているか\n\n" +
       "詳しくはブラウザのコンソールを確認してください。"
@@ -237,6 +250,80 @@ function normalizeRoomInput(value) {
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
+}
+function getPlayerIconSrc(iconId) {
+  const safeIconId = iconId || "icon_01";
+  const icon = PLAYER_ICONS.find((item) => item.id === safeIconId);
+  return icon ? icon.src : "assets/icon/icon_01.jpg";
+}
+
+function getPlayerIconHtml(player, className = "player-icon-img") {
+  const iconSrc = getPlayerIconSrc(player && player.iconId);
+
+  return `
+    <img
+      class="${escapeHtml(className)}"
+      src="${escapeHtml(iconSrc)}"
+      alt=""
+      loading="lazy"
+      onerror="this.onerror=null;this.src='assets/icon/icon_01.jpg';"
+    >
+  `;
+}
+
+function loadSelectedIconId() {
+  try {
+    const saved = localStorage.getItem("niseEshiSelectedIconId");
+
+    if (saved && PLAYER_ICONS.some((icon) => icon.id === saved)) {
+      selectedIconId = saved;
+    }
+  } catch (error) {
+    console.warn("アイコン読込失敗:", error);
+  }
+}
+
+function setupIconSelector() {
+  const grid = $("icon-select-grid");
+  if (!grid) return;
+
+  grid.innerHTML = PLAYER_ICONS.map((icon) => {
+    const selectedClass = icon.id === selectedIconId ? "selected" : "";
+
+    return `
+      <button
+        type="button"
+        class="icon-select-btn ${selectedClass}"
+        data-icon-id="${escapeHtml(icon.id)}"
+        aria-label="${escapeHtml(icon.label)}"
+      >
+        <img
+          src="${escapeHtml(icon.src)}"
+          alt="${escapeHtml(icon.label)}"
+          loading="lazy"
+          onerror="this.onerror=null;this.src='assets/icon/icon_01.jpg';"
+        >
+      </button>
+    `;
+  }).join("");
+
+  grid.querySelectorAll(".icon-select-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedIconId = button.dataset.iconId || "icon_01";
+
+      grid.querySelectorAll(".icon-select-btn").forEach((btn) => {
+        btn.classList.remove("selected");
+      });
+
+      button.classList.add("selected");
+
+      try {
+        localStorage.setItem("niseEshiSelectedIconId", selectedIconId);
+      } catch (error) {
+        console.warn("アイコン保存失敗:", error);
+      }
+    });
+  });
 }
 
 function getMyUidSafe() {
@@ -1145,7 +1232,7 @@ function startOnlineListeners() {
   startPresenceHeartbeat();
   updateMyPresenceOnline();
 
-  // v632fix8
+  // v633
   // 自動ホスト移譲は、スマホの一時的なオフライン誤判定で
   // 参加者が勝手にホストになる原因になるため停止。
   // ホスト移譲は firebase.js の leaveRoom()、つまり「退出する」を押した時だけ行う。
@@ -1159,7 +1246,7 @@ function startOnlineListeners() {
     renderLobbyPlayers(currentPlayers);
     updateLobbyControlButtons();
 
-    // v632fix8
+    // v633
     // 自動ホスト移譲は停止。
     // checkAndTransferHostIfNeeded();
 
@@ -1176,7 +1263,7 @@ GameDB.listenRoom(currentRoomId, async (room) => {
   currentRoomData = room || null;
   updateLobbyControlButtons();
 
-  // v632fix8 debug
+  // v633 debug
   console.log("listenRoom:", {
     phase: room?.phase,
     status: room?.status,
@@ -1200,7 +1287,7 @@ GameDB.listenRoom(currentRoomId, async (room) => {
     return;
   }
 
-  // v632fix8
+  // v633
   // 再プレイ時、gameId が変わったら各端末のローカル状態を必ずリセットする
   if (room.gameId && activeGameId && room.gameId !== activeGameId) {
     resetLocalRoundStateForNewGame(room.gameId);
@@ -1393,9 +1480,9 @@ async function enterRoomFlow() {
     await GameDB.signIn();
 
    if (pendingAction === "create") {
-  await GameDB.createRoom(currentRoomId, playerName);
+  await GameDB.createRoom(currentRoomId, playerName, selectedIconId);
 } else {
-  await GameDB.joinRoom(currentRoomId, playerName);
+  await GameDB.joinRoom(currentRoomId, playerName, selectedIconId);
 }
 
 // v630 前回の部屋情報を保存
@@ -3625,7 +3712,7 @@ function backToTop() {
 // イベント設定 v624 安定版
 // ==============================
 function setupEvents() {
-  console.log("setupEvents v632fix8 start");
+  console.log("setupEvents v633 start");
 
   document.addEventListener("click", async (event) => {
     const target = event.target;
@@ -3818,7 +3905,7 @@ if (id === "force-vote-result-btn") {
     }
   });
 
-  console.log("setupEvents v632fix8 complete");
+  console.log("setupEvents v633 complete");
 }
 
 
@@ -3827,11 +3914,13 @@ if (id === "force-vote-result-btn") {
 // 初期化 v624 安定版
 // ==============================
 function initApp() {
-  console.log("initApp v632fix8 start");
+  console.log("initApp v633 start");
 
   showVersionBadge();
   showHardReloadButton();
 
+  loadSelectedIconId();
+  setupIconSelector();
   initCanvas();
   setupCanvasEvents();
   setupDrawingTools();
@@ -3845,7 +3934,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v632fix8 initialized");
+  console.log("app.js v633 initialized");
 }
 
 if (document.readyState === "loading") {
@@ -3856,14 +3945,14 @@ if (document.readyState === "loading") {
 // ==============================
 // v624 バージョンバッジ強制表示
 // ==============================
-(function forceVersionBadgeV632fix8() {
+(function forceVersionBadgeV633() {
   function run() {
     const oldBadge = document.getElementById("version-badge");
     if (oldBadge) oldBadge.remove();
 
     const badge = document.createElement("div");
     badge.id = "version-badge";
-    badge.textContent = "v632fix8";
+    badge.textContent = "v633";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
@@ -3878,7 +3967,7 @@ if (document.readyState === "loading") {
     badge.style.pointerEvents = "none";
     document.body.appendChild(badge);
 
-    console.log("v632fix8 badge forced");
+    console.log("v633 badge forced");
   }
 
   if (document.readyState === "loading") {
