@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ニセ絵師を探せ</title>
-  <link rel="stylesheet" href="style.css?v=632fix8">
+  <link rel="stylesheet" href="style.css?v=633">
 </head>
 <body>
 
@@ -76,7 +76,15 @@
         <p class="note">みんなに表示される名前です</p>
 
         <input id="player-name-input" type="text" placeholder="あなたの名前" maxlength="12">
-        <button id="enter-room-btn" class="primary-btn">参加する</button>
+
+<div class="icon-select-box">
+  <h3>アイコンを選ぶ</h3>
+  <p class="icon-select-note">ロビーや投票画面に表示されます</p>
+  <div id="icon-select-grid" class="icon-select-grid"></div>
+</div>
+
+<button id="enter-room-btn" class="primary-btn">参加する</button>
+
       </div>
     </section>
 
@@ -280,9 +288,9 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<script src="topics.js?v=632fix8"></script>
+<script src="topics.js?v=633"></script>
 <script src="firebase.js?v=632fix8.js"></script>
-<script src="app.js?v=632fix8"></script>
+<script src="app.js?v=633"></script>
 
 
 
