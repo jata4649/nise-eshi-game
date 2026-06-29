@@ -1,4 +1,4 @@
-console.log("firebase.js version 632fix8 loaded");
+console.log("firebase.js version 633");
 
 // ==============================
 // Firebase 設定
@@ -462,7 +462,7 @@ const updateHost = transferHost;
 // ==============================
 // 作成
 // ==============================
-async function createRoom(roomId, playerName) {
+async function createRoom(roomId, playerName, iconId) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -497,6 +497,7 @@ async function createRoom(roomId, playerName) {
   const playerData = {
     uid: uid,
     name: playerName || "名無し",
+    iconId: iconId || "icon_01",
     ready: true,
     isHost: true,
     online: true,
@@ -555,7 +556,7 @@ async function roomExists(roomId) {
 // ==============================
 // 参加
 // ==============================
-async function joinRoom(roomId, playerName) {
+async function joinRoom(roomId, playerName, iconId) {
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -593,6 +594,7 @@ async function joinRoom(roomId, playerName) {
       online: true,
       joinedAtMs: joinedAtMs,
       lastSeenAtMs: Date.now(),
+      iconId: iconId || "icon_01",
       joinedAt: playerSnap.exists
         ? playerSnap.data().joinedAt || firebase.firestore.FieldValue.serverTimestamp()
         : firebase.firestore.FieldValue.serverTimestamp(),
@@ -1054,7 +1056,7 @@ batch.set(
 
   await batch.commit();
 
-  console.log("ゲーム開始 v632fix8:", {
+  console.log("ゲーム開始 v633:", {
     roomId: cleanRoomId,
     gameId,
     fakeUid,
