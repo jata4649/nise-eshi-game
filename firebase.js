@@ -1,4 +1,4 @@
-console.log("firebase.js version 633 loaded");
+console.log("firebase.js version 633");
 
 // ==============================
 // Firebase 設定
@@ -45,7 +45,7 @@ let unsubscribeVotes = null;
 
 
 // ==============================
-// v633 オンライン判定
+// v632 オンライン判定
 // ==============================
 const FIREBASE_PRESENCE_TIMEOUT_MS = 90000;
 
@@ -463,7 +463,6 @@ const updateHost = transferHost;
 // 作成
 // ==============================
 async function createRoom(roomId, playerName, iconId) {
-
   const uid = await signIn();
   const cleanRoomId = normalizeRoomId(roomId);
 
@@ -495,20 +494,19 @@ async function createRoom(roomId, playerName, iconId) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-const playerData = {
-  uid: uid,
-  name: playerName || "名無し",
-  iconId: iconId || "icon_01",
-  ready: true,
-  isHost: true,
-  online: true,
-  joinedAtMs: joinedAtMs,
-  lastSeenAtMs: Date.now(),
-  joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-  lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
-  updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-};
-
+  const playerData = {
+    uid: uid,
+    name: playerName || "名無し",
+    iconId: iconId || "icon_01",
+    ready: true,
+    isHost: true,
+    online: true,
+    joinedAtMs: joinedAtMs,
+    lastSeenAtMs: Date.now(),
+    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
 
   const batch = db.batch();
   batch.set(roomRef, roomData, { merge: true });
@@ -587,25 +585,24 @@ async function joinRoom(roomId, playerName, iconId) {
     ? playerSnap.data().joinedAtMs
     : Date.now();
 
-await playerRef.set(
-  {
-    uid: uid,
-    name: playerName || "名無し",
-    iconId: iconId || "icon_01",
-    ready: false,
-    isHost: false,
-    online: true,
-    joinedAtMs: joinedAtMs,
-    lastSeenAtMs: Date.now(),
-    joinedAt: playerSnap.exists
-      ? playerSnap.data().joinedAt || firebase.firestore.FieldValue.serverTimestamp()
-      : firebase.firestore.FieldValue.serverTimestamp(),
-    lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  },
-  { merge: true }
-);
-
+  await playerRef.set(
+    {
+      uid: uid,
+      name: playerName || "名無し",
+      ready: false,
+      isHost: false,
+      online: true,
+      joinedAtMs: joinedAtMs,
+      lastSeenAtMs: Date.now(),
+      iconId: iconId || "icon_01",
+      joinedAt: playerSnap.exists
+        ? playerSnap.data().joinedAt || firebase.firestore.FieldValue.serverTimestamp()
+        : firebase.firestore.FieldValue.serverTimestamp(),
+      lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
 
   await roomRef.set(
     {
