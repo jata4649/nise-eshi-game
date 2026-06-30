@@ -3216,3 +3216,67 @@ input:focus {
   border-radius: 999px;
   background: #fff;
 }
+
+.icon-select-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.icon-select-btn {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  margin: 0;
+  padding: 4px;
+  border: 3px solid #8b6a3a;
+  border-radius: 16px;
+  background: #fffaf0;
+  overflow: hidden;
+}
+
+.icon-select-btn img {
+  width: 100%;
+  height: 100%;
+  max-width: 54px;
+  max-height: 54px;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+  margin: 0 auto;
+}
+
+.icon-select-btn.selected {
+  border-color: #ff4f7b;
+  background: #ffe3ec;
+  outline: 4px solid #ffcf5c;
+}
+
+.icon-select-btn.selected::after {
+  content: "✓";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: #ff4f7b;
+  color: white;
+  border: 2px solid #2b2118;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.lobby-player-icon,
+.player-icon-img {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  object-fit: cover;
+  border: 2px solid #2b2118;
+  border-radius: 999px;
+  background: #fff;
+}
