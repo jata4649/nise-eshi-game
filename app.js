@@ -1,4 +1,4 @@
-console.log("app.js version 633 loaded");
+console.log("app.js version 634 loaded");
 
 // ==============================
 // v633 バージョン表示
@@ -9,7 +9,7 @@ function showVersionBadge() {
 
   const badge = document.createElement("div");
   badge.id = "version-badge";
-  badge.textContent = "v633";
+  badge.textContent = "v634";
   badge.style.position = "fixed";
   badge.style.right = "8px";
   badge.style.bottom = "8px";
@@ -66,14 +66,14 @@ function showHardReloadButton() {
       }
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "633");
+      url.searchParams.set("v", "634");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     } catch (error) {
       console.error("最新版更新失敗:", error);
 
       const url = new URL(window.location.href);
-      url.searchParams.set("v", "633");
+      url.searchParams.set("v", "634");
       url.searchParams.set("reload", Date.now().toString());
       window.location.href = url.toString();
     }
@@ -152,7 +152,7 @@ const LOGICAL_CANVAS_SIZE = 1000;
 const APP_PRESENCE_TIMEOUT_MS = 90000;
 const APP_PRESENCE_UPDATE_INTERVAL_MS = 15000;
 const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 20000;
-const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV633";
+const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV634";
 const PLAYER_ICONS = [
   { id: "icon_01", src: "assets/icon/icon_01.png", label: "アイコン1" },
   { id: "icon_02", src: "assets/icon/icon_02.png", label: "アイコン2" },
@@ -3719,7 +3719,7 @@ function backToTop() {
 // イベント設定 v624 安定版
 // ==============================
 function setupEvents() {
-  console.log("setupEvents v633 start");
+  console.log("setupEvents v634 start");
 
   document.addEventListener("click", async (event) => {
     const target = event.target;
@@ -3912,7 +3912,7 @@ if (id === "force-vote-result-btn") {
     }
   });
 
-  console.log("setupEvents v633 complete");
+  console.log("setupEvents v634 complete");
 }
 
 
@@ -3921,7 +3921,7 @@ if (id === "force-vote-result-btn") {
 // 初期化 v624 安定版
 // ==============================
 function initApp() {
-  console.log("initApp v633 start");
+  console.log("initApp v634 start");
 
   showVersionBadge();
   showHardReloadButton();
@@ -3941,7 +3941,7 @@ function initApp() {
     updateLobbyControlButtons();
   }, 300);
 
-  console.log("app.js v633 initialized");
+  console.log("app.js v634 initialized");
 }
 
 if (document.readyState === "loading") {
@@ -3952,14 +3952,14 @@ if (document.readyState === "loading") {
 // ==============================
 // v624 バージョンバッジ強制表示
 // ==============================
-(function forceVersionBadgeV633() {
+(function forceVersionBadgeV634() {
   function run() {
     const oldBadge = document.getElementById("version-badge");
     if (oldBadge) oldBadge.remove();
 
     const badge = document.createElement("div");
     badge.id = "version-badge";
-    badge.textContent = "v633";
+    badge.textContent = "v634";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
@@ -3974,7 +3974,7 @@ if (document.readyState === "loading") {
     badge.style.pointerEvents = "none";
     document.body.appendChild(badge);
 
-    console.log("v633 badge forced");
+    console.log("v634 badge forced");
   }
 
   if (document.readyState === "loading") {
