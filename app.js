@@ -154,17 +154,18 @@ const APP_PRESENCE_UPDATE_INTERVAL_MS = 15000;
 const APP_HOST_TRANSFER_CHECK_INTERVAL_MS = 20000;
 const LAST_ROOM_STORAGE_KEY = "niseEshiLastRoomV633";
 const PLAYER_ICONS = [
-  { id: "icon_01", src: "assets/icon/icon_01.jpg", label: "アイコン1" },
-  { id: "icon_02", src: "assets/icon/icon_02.jpg", label: "アイコン2" },
-  { id: "icon_03", src: "assets/icon/icon_03.jpg", label: "アイコン3" },
-  { id: "icon_04", src: "assets/icon/icon_04.jpg", label: "アイコン4" },
-  { id: "icon_05", src: "assets/icon/icon_05.jpg", label: "アイコン5" },
-  { id: "icon_06", src: "assets/icon/icon_06.jpg", label: "アイコン6" },
-  { id: "icon_07", src: "assets/icon/icon_07.jpg", label: "アイコン7" },
-  { id: "icon_08", src: "assets/icon/icon_08.jpg", label: "アイコン8" },
-  { id: "icon_09", src: "assets/icon/icon_09.jpg", label: "アイコン9" },
-  { id: "icon_10", src: "assets/icon/icon_10.jpg", label: "アイコン10" }
+  { id: "icon_01", src: "assets/icon/icon_01.png", label: "アイコン1" },
+  { id: "icon_02", src: "assets/icon/icon_02.png", label: "アイコン2" },
+  { id: "icon_03", src: "assets/icon/icon_03.png", label: "アイコン3" },
+  { id: "icon_04", src: "assets/icon/icon_04.png", label: "アイコン4" },
+  { id: "icon_05", src: "assets/icon/icon_05.png", label: "アイコン5" },
+  { id: "icon_06", src: "assets/icon/icon_06.png", label: "アイコン6" },
+  { id: "icon_07", src: "assets/icon/icon_07.png", label: "アイコン7" },
+  { id: "icon_08", src: "assets/icon/icon_08.png", label: "アイコン8" },
+  { id: "icon_09", src: "assets/icon/icon_09.png", label: "アイコン9" },
+  { id: "icon_10", src: "assets/icon/icon_10.png", label: "アイコン10" }
 ];
+
 
 // v624 互換用：古い変数名が残っていても落ちないようにする
 const HOST_TRANSFER_CHECK_INTERVAL_MS = APP_HOST_TRANSFER_CHECK_INTERVAL_MS;
@@ -254,7 +255,7 @@ function normalizeRoomInput(value) {
 function getPlayerIconSrc(iconId) {
   const safeIconId = iconId || "icon_01";
   const icon = PLAYER_ICONS.find((item) => item.id === safeIconId);
-  return icon ? icon.src : "assets/icon/icon_01.jpg";
+  return icon ? icon.src : "assets/icon/icon_01.png";
 }
 
 function getPlayerIconHtml(player, className = "player-icon-img") {
@@ -266,7 +267,7 @@ function getPlayerIconHtml(player, className = "player-icon-img") {
       src="${escapeHtml(iconSrc)}"
       alt=""
       loading="lazy"
-      onerror="this.onerror=null;this.src='assets/icon/icon_01.jpg';"
+      onerror="this.onerror=null;this.src='assets/icon/icon_01.png';"
     >
   `;
 }
@@ -301,7 +302,7 @@ function setupIconSelector() {
           src="${escapeHtml(icon.src)}"
           alt="${escapeHtml(icon.label)}"
           loading="lazy"
-          onerror="this.onerror=null;this.src='assets/icon/icon_01.jpg';"
+          onerror="this.onerror=null;this.src='assets/icon/icon_01.png';"
         >
       </button>
     `;
